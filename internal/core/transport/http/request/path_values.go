@@ -1,4 +1,4 @@
-package core_http_utils
+package core_http_request
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func GetIntPathValue(r *http.Request, key string) (int, error){
 	val, err := strconv.Atoi(pathValue)
 	if err != nil{
 		return 0, fmt.Errorf(
-			"path value='%s' by key='%s' not a valid inerger: %v: %w",
+			"path value='%s' by key='%s' not a valid integer: %v: %w",
 			pathValue,
 			key,
 			err,

@@ -33,22 +33,22 @@ func NewHTTPServer(
 	}
 }
 
-func (h *HTTPServer) RegisterAPIRouters(routers ...*APIVersionRouter){
+func (s *HTTPServer) RegisterAPIRouters(routers ...*APIVersionRouter){
 	for _, router := range routers{
 		prefix := "/api/" + string(router.apiVersion)
 
-		h.mux.Handle(
+		s.mux.Handle(
 			prefix+"/",
-			http.StripPrefix(prefix, router),
+			http.StripPrefix(prefix, router.WithMiddleware()),
 		)
 	}
 }
 
 
-func (h *HTTPServer) Run(ctx context.Context) error{
-	mux := core_http_middleware.ChainMiddleware(h.mux, h.middleware...)
+func (s *HTTPServer) Run(ctx context.Context) error{
+	mux := core_http_middleware.ChainMiddleware(s.mux, s.middleware...)
 	server := &http.Server{
-		Addr: h.config.Addr,
+		Addr: s.config.Addr,
 		Handler: mux,
 	}
 
@@ -57,7 +57,7 @@ func (h *HTTPServer) Run(ctx context.Context) error{
 	go func () {
 		defer close(ch)
 
-		h.log.Warn("start http server", zap.String("addr", h.config.Addr))
+		s.log.Warn("start http server", zap.String("addr", s.config.Addr))
 
 		err := server.ListenAndServe()
 
@@ -72,11 +72,11 @@ func (h *HTTPServer) Run(ctx context.Context) error{
 			return  fmt.Errorf("listen and server HTTP: %w", err)
 		}
 	case <-ctx.Done():
-		h.log.Warn("shutdown HTTP server...")
+		s.log.Warn("shutdown HTTP server...")
 
 		shutdownCtx, cancel := context.WithTimeout(
 			context.Background(),
-			h.config.ShutdowunTimeout,
+			s.config.ShutdowunTimeout,
 		)
 		defer cancel()
 
@@ -86,7 +86,7 @@ func (h *HTTPServer) Run(ctx context.Context) error{
 			return fmt.Errorf("shutdown HTTP server: %w", err)
 		}
 
-		h.log.Warn("HTTP server stopped")
+		s.log.Warn("HTTP server stopped")
 	}
 	return nil
 }
