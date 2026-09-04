@@ -6,26 +6,26 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-type UsersService struct{
+type UsersService struct {
 	usersRepository UsersRepository
 }
 
-type UsersRepository interface{
+type UsersRepository interface {
 	CreateUser(
 		ctx context.Context,
 		user domain.User,
-	)(domain.User, error)
+	) (domain.User, error)
 
 	GetUsers(
 		ctx context.Context,
 		limit *int,
 		offset *int,
-	)([]domain.User,error)
+	) ([]domain.User, error)
 
 	GetUser(
 		ctx context.Context,
 		id int,
-	)(domain.User, error)
+	) (domain.User, error)
 
 	DeleteUser(
 		ctx context.Context,
@@ -41,7 +41,7 @@ type UsersRepository interface{
 
 func NewUserService(
 	usersRepository UsersRepository,
-) *UsersService{
+) *UsersService {
 	return &UsersService{
 		usersRepository: usersRepository,
 	}

@@ -8,13 +8,13 @@ import (
 	core_http_response "github.com/dadqeds/todoapp/internal/core/transport/http/response"
 )
 
-func (h *TasksHTTPHandler) DeleteTask(rw http.ResponseWriter,r *http.Request){
+func (h *TasksHTTPHandler) DeleteTask(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := core_logger.FromContext(ctx)
 	responseHandler := core_http_response.NewHTTPResponseHandler(log, rw)
 
-	taskID, err := core_http_request.GetIntPathValue(r,"id")
-	if err != nil{
+	taskID, err := core_http_request.GetIntPathValue(r, "id")
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get taskID in path value",
@@ -22,7 +22,7 @@ func (h *TasksHTTPHandler) DeleteTask(rw http.ResponseWriter,r *http.Request){
 		return
 	}
 
-	if err := h.tasksService.DeleteTask(ctx, taskID); err != nil{
+	if err := h.tasksService.DeleteTask(ctx, taskID); err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to delete task",

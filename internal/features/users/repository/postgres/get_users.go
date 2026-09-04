@@ -7,12 +7,12 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-func(r *UsersRepository ) GetUsers(
-		ctx context.Context,
-		limit *int,
-		offset *int,
-	)([]domain.User,error){
-	
+func (r *UsersRepository) GetUsers(
+	ctx context.Context,
+	limit *int,
+	offset *int,
+) ([]domain.User, error) {
+
 	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
@@ -29,14 +29,14 @@ func(r *UsersRepository ) GetUsers(
 		limit,
 		offset,
 	)
-	if err != nil{
-		return  nil, fmt.Errorf("select users: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("select users: %w", err)
 	}
 	defer rows.Close()
 
 	var userModels []UserModel
 
-	for rows.Next(){
+	for rows.Next() {
 		var userModel UserModel
 
 		err := rows.Scan(
@@ -45,14 +45,14 @@ func(r *UsersRepository ) GetUsers(
 			&userModel.FullName,
 			&userModel.PhoneNumber,
 		)
-		if err != nil{
-			return nil, fmt.Errorf("scan users: %w",err)
+		if err != nil {
+			return nil, fmt.Errorf("scan users: %w", err)
 		}
 
 		userModels = append(userModels, userModel)
 	}
 
-	if err := rows.Err(); err != nil{
+	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("next roes: %w", err)
 	}
 	userdomains := userDomainsFromModels(userModels)

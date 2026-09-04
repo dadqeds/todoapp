@@ -5,11 +5,11 @@ import (
 	"fmt"
 )
 
-func(s *UsersService) DeleteUser(
+func (s *UsersService) DeleteUser(
 	ctx context.Context,
 	id int,
-	) error {
-	if err := s.usersRepository.DeleteUser(ctx, id); err != nil{
+) error {
+	if err := s.usersRepository.DeleteUser(ctx, id); err != nil {
 		return fmt.Errorf(
 			"delete user: %w",
 			err,

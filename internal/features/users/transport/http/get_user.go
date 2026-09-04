@@ -10,13 +10,13 @@ import (
 
 type GetUserResponse UserDTOResponse
 
-func(h *UsersHTTPHandler) GetUser(rw http.ResponseWriter,r *http.Request){
+func (h *UsersHTTPHandler) GetUser(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := core_logger.FromContext(ctx)
-	responseHandler := core_http_response.NewHTTPResponseHandler(log,rw)
+	responseHandler := core_http_response.NewHTTPResponseHandler(log, rw)
 
 	userID, err := core_http_request.GetIntPathValue(r, "id")
-	if err != nil{
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get userID to path value",
@@ -24,8 +24,8 @@ func(h *UsersHTTPHandler) GetUser(rw http.ResponseWriter,r *http.Request){
 		return
 	}
 
-	user , err :=h.usersService.GetUser(ctx, userID)
-	if err != nil{
+	user, err := h.usersService.GetUser(ctx, userID)
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed get user",
@@ -34,5 +34,5 @@ func(h *UsersHTTPHandler) GetUser(rw http.ResponseWriter,r *http.Request){
 	}
 	response := GetUserResponse(userDTOFromDomain(user))
 
-	responseHandler.JSONResponse(response,http.StatusOK)
+	responseHandler.JSONResponse(response, http.StatusOK)
 }

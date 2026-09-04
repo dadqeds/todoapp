@@ -7,13 +7,12 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-
-func(s *TasksService) GetTask(
+func (s *TasksService) GetTask(
 	ctx context.Context,
 	id int,
-)(domain.Task, error){
+) (domain.Task, error) {
 	task, err := s.tasksRepository.GetTask(ctx, id)
-	if err != nil{
+	if err != nil {
 		return domain.Task{}, fmt.Errorf(
 			"get task from repositroy: %w",
 			err,

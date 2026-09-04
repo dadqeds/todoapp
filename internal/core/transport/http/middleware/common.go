@@ -10,28 +10,28 @@ import (
 	"go.uber.org/zap"
 )
 
-const(
+const (
 	RequestIDHeader = "X-Request-ID"
 )
 
-func RequestID() Middleware{
+func RequestID() Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestID := r.Header.Get(RequestIDHeader)
-			if requestID == ""{
+			if requestID == "" {
 				requestID = uuid.NewString()
 			}
 
-			r.Header.Set(RequestIDHeader,requestID)
-			w.Header().Set(RequestIDHeader,requestID)
+			r.Header.Set(RequestIDHeader, requestID)
+			w.Header().Set(RequestIDHeader, requestID)
 
-			next.ServeHTTP(w, r) 
+			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-func Logger(log *core_logger.Logger) Middleware{
+func Logger(log *core_logger.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestID := r.Header.Get(RequestIDHeader)
@@ -43,14 +43,12 @@ func Logger(log *core_logger.Logger) Middleware{
 
 			ctx := core_logger.ToContext(r.Context(), l)
 
-			next.ServeHTTP(w,r.WithContext(ctx))
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
-		}
+	}
 }
 
-
-
-func Trace() Middleware{
+func Trace() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -59,33 +57,31 @@ func Trace() Middleware{
 
 			before := time.Now()
 			log.Debug(
-			">>> incomming HTTP request",
-			zap.String("http_method",r.Method),
-			zap.Time("time",before.UTC()),
+				">>> incomming HTTP request",
+				zap.String("http_method", r.Method),
+				zap.Time("time", before.UTC()),
 			)
 
-			
-			next.ServeHTTP(rw,r)
-
+			next.ServeHTTP(rw, r)
 
 			log.Debug(
 				"<<< done HTTP request",
-				zap.Int("status_code",rw.GetStatuCode()),
-				zap.Duration("latency",time.Since(before)),
+				zap.Int("status_code", rw.GetStatuCode()),
+				zap.Duration("latency", time.Since(before)),
 			)
 		})
 	}
 }
 
-func Panic() Middleware{
+func Panic() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			log := core_logger.FromContext(ctx)
 			responseHandler := core_http_response.NewHTTPResponseHandler(log, w)
 
-			defer func(){
-				if p := recover();p != nil{
+			defer func() {
+				if p := recover(); p != nil {
 					responseHandler.PanicResponse(
 						p,
 						"during handel HTTP request got unexpected panic",
@@ -93,7 +89,7 @@ func Panic() Middleware{
 				}
 			}()
 
-			next.ServeHTTP(w,r)
+			next.ServeHTTP(w, r)
 		})
 	}
 }

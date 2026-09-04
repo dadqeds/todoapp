@@ -10,7 +10,7 @@ import (
 func (r *TasksRepository) DeleteTask(
 	ctx context.Context,
 	id int,
-) error{
+) error {
 	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
@@ -20,14 +20,14 @@ func (r *TasksRepository) DeleteTask(
 	`
 
 	cmdTag, err := r.pool.Exec(ctx, query, id)
-	if err != nil{
+	if err != nil {
 		return fmt.Errorf(
 			"exec query: %w",
 			err,
 		)
 	}
 
-	if cmdTag.RowsAffected() == 0{
+	if cmdTag.RowsAffected() == 0 {
 		return fmt.Errorf(
 			"task with id='%d': %w",
 			id,

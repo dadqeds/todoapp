@@ -7,13 +7,13 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-func(r *TasksRepository) GetTasks(
+func (r *TasksRepository) GetTasks(
 	ctx context.Context,
 	userID *int,
 	limit *int,
 	offset *int,
-)([]domain.Task, error){
-	ctx, cancel := context.WithTimeout(ctx ,r.pool.OpTimeout())
+) ([]domain.Task, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
 	query := `
@@ -27,11 +27,11 @@ func(r *TasksRepository) GetTasks(
 
 	args := []any{limit, offset}
 
-	if userID !=nil{
-		query = fmt.Sprintf(query,"WHERE author_user_id=$3")
+	if userID != nil {
+		query = fmt.Sprintf(query, "WHERE author_user_id=$3")
 		args = append(args, userID)
-	}else{
-		query = fmt.Sprintf(query,"")
+	} else {
+		query = fmt.Sprintf(query, "")
 	}
 
 	rows, err := r.pool.Query(
@@ -40,14 +40,14 @@ func(r *TasksRepository) GetTasks(
 		args...,
 	)
 
-	if err != nil{
+	if err != nil {
 		return nil, fmt.Errorf("select tasks: %w", err)
 	}
 	defer rows.Close()
 
 	var taskModels []TaskModel
 
-	for rows.Next(){
+	for rows.Next() {
 		var taskModel TaskModel
 
 		err := rows.Scan(
@@ -60,17 +60,17 @@ func(r *TasksRepository) GetTasks(
 			&taskModel.CompletedAt,
 			&taskModel.AuthorUserID,
 		)
-		if err != nil{
+		if err != nil {
 			return nil, fmt.Errorf("scan tasks:%w", err)
 		}
 
 		taskModels = append(taskModels, taskModel)
 	}
-	if err := rows.Err(); err != nil{
+	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("next rows: %w", err)
 	}
 
 	taskDomains := taskDomainsFromModles(taskModels)
-	
+
 	return taskDomains, nil
 }

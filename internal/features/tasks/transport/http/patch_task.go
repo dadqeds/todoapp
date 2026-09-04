@@ -11,35 +11,35 @@ import (
 	core_http_types "github.com/dadqeds/todoapp/internal/core/transport/http/types"
 )
 
-type PatchTaskRequest struct{
-	Title core_http_types.Nullable[string] `json:"title"`
+type PatchTaskRequest struct {
+	Title       core_http_types.Nullable[string] `json:"title"`
 	Description core_http_types.Nullable[string] `json:"description"`
-	Completed core_http_types.Nullable [bool] `json:"completed"`
+	Completed   core_http_types.Nullable[bool]   `json:"completed"`
 }
 
-func(r *PatchTaskRequest) Validate() error{
-	if r.Title.Set{
-		if r.Title.Value == nil{
+func (r *PatchTaskRequest) Validate() error {
+	if r.Title.Set {
+		if r.Title.Value == nil {
 			return fmt.Errorf("`Title` cant be NULL")
 		}
 		titelLen := len([]rune(*r.Title.Value))
-		if titelLen < 1 || titelLen > 100{
+		if titelLen < 1 || titelLen > 100 {
 			return fmt.Errorf("`Title` must be between 1 and 100 symbols")
 		}
 	}
 
-	if r.Description.Set{
-		if r.Description.Value != nil{
+	if r.Description.Set {
+		if r.Description.Value != nil {
 			descriptionLen := len([]rune(*r.Description.Value))
-			if descriptionLen < 1 || descriptionLen > 1000{
+			if descriptionLen < 1 || descriptionLen > 1000 {
 				return fmt.Errorf("`Description` must be beetweeon 1 and 1000 symbols")
 			}
 
 		}
 	}
 
-	if r.Completed.Set{
-		if r.Completed.Value == nil{
+	if r.Completed.Set {
+		if r.Completed.Value == nil {
 			return fmt.Errorf("`Completed` cant be NULL")
 		}
 	}
@@ -49,13 +49,13 @@ func(r *PatchTaskRequest) Validate() error{
 
 type PatchUserResponse TaskDTOResponse
 
-func(h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter,r *http.Request){
+func (h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := core_logger.FromContext(ctx)
 	responseHandler := core_http_response.NewHTTPResponseHandler(log, rw)
 
-	taskID, err := core_http_request.GetIntPathValue(r,"id")
-	if err != nil{
+	taskID, err := core_http_request.GetIntPathValue(r, "id")
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get taskID in path value",
@@ -64,7 +64,7 @@ func(h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter,r *http.Request){
 	}
 
 	var request PatchTaskRequest
-	if err := core_http_request.DecodeAndValidateRequest(r, &request); err != nil{
+	if err := core_http_request.DecodeAndValidateRequest(r, &request); err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to decode and validate HTTP request",
@@ -75,8 +75,8 @@ func(h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter,r *http.Request){
 
 	taskPatch := taskPatchFromRequest(request)
 
-	taskDomain, err := h.tasksService.PatchTask(ctx,taskID,taskPatch)
-	if err != nil{
+	taskDomain, err := h.tasksService.PatchTask(ctx, taskID, taskPatch)
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to patch task",
@@ -86,7 +86,7 @@ func(h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter,r *http.Request){
 	}
 
 	response := PatchUserResponse(taskDTOFromDomain(taskDomain))
-	responseHandler.JSONResponse(response,http.StatusOK)
+	responseHandler.JSONResponse(response, http.StatusOK)
 }
 
 func taskPatchFromRequest(request PatchTaskRequest) domain.TaskPatch {

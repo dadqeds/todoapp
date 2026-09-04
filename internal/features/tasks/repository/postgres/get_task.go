@@ -10,11 +10,10 @@ import (
 	core_postgres_pool "github.com/dadqeds/todoapp/internal/core/repository/postgres/pool"
 )
 
-
 func (r *TasksRepository) GetTask(
 	ctx context.Context,
 	id int,
-)(domain.Task, error){
+) (domain.Task, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
@@ -38,8 +37,8 @@ func (r *TasksRepository) GetTask(
 		&taskModel.CompletedAt,
 		&taskModel.AuthorUserID,
 	)
-	if err != nil{
-		if errors.Is(err, core_postgres_pool.ErrNoRows){
+	if err != nil {
+		if errors.Is(err, core_postgres_pool.ErrNoRows) {
 			return domain.Task{}, fmt.Errorf(
 				"task with id='%v': %w",
 				id,

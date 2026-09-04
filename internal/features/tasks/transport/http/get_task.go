@@ -10,13 +10,13 @@ import (
 
 type GetTaskResponse TaskDTOResponse
 
-func (h *TasksHTTPHandler) GetTask(rw http.ResponseWriter, r *http.Request){
+func (h *TasksHTTPHandler) GetTask(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := core_logger.FromContext(ctx)
-	responseHandler := core_http_response.NewHTTPResponseHandler(log,rw)
+	responseHandler := core_http_response.NewHTTPResponseHandler(log, rw)
 
-	taskID, err := core_http_request.GetIntPathValue(r,"id")
-	if err != nil{
+	taskID, err := core_http_request.GetIntPathValue(r, "id")
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get taskID path value",
@@ -26,7 +26,7 @@ func (h *TasksHTTPHandler) GetTask(rw http.ResponseWriter, r *http.Request){
 	}
 
 	taskDomain, err := h.tasksService.GetTask(ctx, taskID)
-	if err != nil{
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get task",
@@ -36,5 +36,5 @@ func (h *TasksHTTPHandler) GetTask(rw http.ResponseWriter, r *http.Request){
 	}
 	response := GetTaskResponse(taskDTOFromDomain(taskDomain))
 
-	responseHandler.JSONResponse(response,http.StatusOK)
+	responseHandler.JSONResponse(response, http.StatusOK)
 }

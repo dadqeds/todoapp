@@ -11,12 +11,12 @@ import (
 
 var requestValidator = validator.New()
 
-type validatable interface{
+type validatable interface {
 	Validate() error
 }
 
 func DecodeAndValidateRequest(r *http.Request, dest any) error {
-	if err := json.NewDecoder(r.Body).Decode(dest); err != nil{
+	if err := json.NewDecoder(r.Body).Decode(dest); err != nil {
 		return fmt.Errorf(
 			"decode json: %v: %w",
 			err,
@@ -31,10 +31,10 @@ func DecodeAndValidateRequest(r *http.Request, dest any) error {
 	v, ok := dest.(validatable)
 	if ok {
 		err = v.Validate()
-	}else{
+	} else {
 		err = requestValidator.Struct(dest)
 	}
-	if err != nil{
+	if err != nil {
 		return fmt.Errorf(
 			"request validator: %v: %w",
 			err,

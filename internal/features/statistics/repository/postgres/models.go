@@ -1,4 +1,4 @@
-package tasks_postgres_repository
+package statistics_postgres_repository
 
 import (
 	"time"

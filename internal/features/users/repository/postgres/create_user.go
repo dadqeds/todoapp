@@ -7,10 +7,10 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-func (r *UsersRepository)  CreateUser(
+func (r *UsersRepository) CreateUser(
 	ctx context.Context,
 	user domain.User,
-	)(domain.User, error) {
+) (domain.User, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
@@ -19,7 +19,7 @@ func (r *UsersRepository)  CreateUser(
 	VALUES ($1, $2)
 	RETURNING id, version, full_name, phone_number;
 	`
-	row := r.pool.QueryRow(ctx,query,user.FullName, user.PhoneNumber)
+	row := r.pool.QueryRow(ctx, query, user.FullName, user.PhoneNumber)
 	var UserModel UserModel
 	err := row.Scan(
 		&UserModel.ID,
@@ -27,7 +27,7 @@ func (r *UsersRepository)  CreateUser(
 		&UserModel.FullName,
 		&UserModel.PhoneNumber,
 	)
-	if err != nil{
+	if err != nil {
 		return domain.User{}, fmt.Errorf("scan error: %w", err)
 	}
 	userDomain := domain.NewUser(
