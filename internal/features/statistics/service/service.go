@@ -7,22 +7,22 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-type StatisticsService struct{
+type StatisticsService struct {
 	statisticsRepository StatisticsRepository
 }
 
-type StatisticsRepository interface{
+type StatisticsRepository interface {
 	GetTasks(
 		ctx context.Context,
 		userID *int,
 		from *time.Time,
 		to *time.Time,
-	)([]domain.Task, error)
+	) ([]domain.Task, error)
 }
 
 func NewStatisticsService(
 	statisticsRepository StatisticsRepository,
-) *StatisticsService{
+) *StatisticsService {
 	return &StatisticsService{
 		statisticsRepository: statisticsRepository,
 	}

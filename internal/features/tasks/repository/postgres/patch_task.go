@@ -10,12 +10,12 @@ import (
 	core_postgres_pool "github.com/dadqeds/todoapp/internal/core/repository/postgres/pool"
 )
 
-func(r *TasksRepository) PatchTask(
+func (r *TasksRepository) PatchTask(
 	ctx context.Context,
 	id int,
 	task domain.Task,
-)(domain.Task, error){
-	ctx, cancel := context.WithTimeout(ctx,r.pool.OpTimeout())
+) (domain.Task, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
 	query := `
@@ -60,10 +60,10 @@ func(r *TasksRepository) PatchTask(
 		&taskModel.Completed,
 		&taskModel.CreatedAt,
 		&taskModel.CompletedAt,
-		&taskModel.AuthorUserID,		
+		&taskModel.AuthorUserID,
 	)
-	if err != nil{
-		if errors.Is(err, core_postgres_pool.ErrNoRows){
+	if err != nil {
+		if errors.Is(err, core_postgres_pool.ErrNoRows) {
 			return domain.Task{}, fmt.Errorf(
 				"task with id='%d' concurrently accessed: %w",
 				id,

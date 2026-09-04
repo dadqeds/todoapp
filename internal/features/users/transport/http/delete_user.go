@@ -8,13 +8,13 @@ import (
 	core_http_response "github.com/dadqeds/todoapp/internal/core/transport/http/response"
 )
 
-func(h *UsersHTTPHandler) DeleteUser(rw http.ResponseWriter, r *http.Request){
+func (h *UsersHTTPHandler) DeleteUser(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := core_logger.FromContext(ctx)
-	responseHandler := core_http_response.NewHTTPResponseHandler(log,rw)
+	responseHandler := core_http_response.NewHTTPResponseHandler(log, rw)
 
-	userId, err := core_http_request.GetIntPathValue(r,"id")
-	if err != nil{
+	userId, err := core_http_request.GetIntPathValue(r, "id")
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get userID path value",
@@ -22,13 +22,13 @@ func(h *UsersHTTPHandler) DeleteUser(rw http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	if err := h.usersService.DeleteUser(ctx, userId); err != nil{
+	if err := h.usersService.DeleteUser(ctx, userId); err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to delete user",
 		)
 		return
 	}
-	
+
 	responseHandler.NoContentResponse()
 }

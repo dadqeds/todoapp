@@ -7,20 +7,20 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-func(s *UsersService) PatchUser(
+func (s *UsersService) PatchUser(
 	ctx context.Context,
 	id int,
 	patch domain.UserPatch,
-)(domain.User, error){
-	user, err := s.GetUser(ctx,id)
-	if err != nil{
+) (domain.User, error) {
+	user, err := s.GetUser(ctx, id)
+	if err != nil {
 		return domain.User{}, fmt.Errorf("get user: %w", err)
 	}
-	if err := user.ApplyPatch(patch); err != nil{
+	if err := user.ApplyPatch(patch); err != nil {
 		return domain.User{}, fmt.Errorf("apply user patch: %w", err)
 	}
-	patchedUser, err := s.usersRepository.PatchUser(ctx,id,user)
-	if err != nil{
+	patchedUser, err := s.usersRepository.PatchUser(ctx, id, user)
+	if err != nil {
 		return domain.User{}, fmt.Errorf("patch user: %w", err)
 	}
 

@@ -1,6 +1,6 @@
 package domain
 
-var(
-	UninitializedID = -1
-	UninitializedVersion =-1
+var (
+	UninitializedID      = -1
+	UninitializedVersion = -1
 )

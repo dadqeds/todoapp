@@ -11,20 +11,20 @@ import (
 	core_http_response "github.com/dadqeds/todoapp/internal/core/transport/http/response"
 )
 
-type GetStatisticsResponse struct{
-	TasksCreated int
-	TasksComplited int
-	TasksComplitedRate *float64
-	TasksAverageCompletionTime *string
+type GetStatisticsResponse struct {
+	TasksCreated               int      `json:"tasks_created"`
+	TasksComplited             int      `json:"tasks_complited"`
+	TasksComplitedRate         *float64 `json:"tasks_complited_rate"`
+	TasksAverageCompletionTime *string  `json:"tasks_average_completion_time"`
 }
 
-func (h *StatisticsHTTPHandler) GetStatistics(rw http.ResponseWriter,r *http.Request){
+func (h *StatisticsHTTPHandler) GetStatistics(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := core_logger.FromContext(ctx)
 	responseHandler := core_http_response.NewHTTPResponseHandler(log, rw)
 
 	userID, from, to, err := getUserIdFromToQueryParams(r)
-	if err != nil{
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get userID/from/to query params",
@@ -32,8 +32,8 @@ func (h *StatisticsHTTPHandler) GetStatistics(rw http.ResponseWriter,r *http.Req
 		return
 	}
 
-	statistics, err :=h.statisticsService.GetStatistics(ctx,userID,from,to)
-	if err != nil{
+	statistics, err := h.statisticsService.GetStatistics(ctx, userID, from, to)
+	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
 			"failed to get statistics ",
@@ -42,46 +42,45 @@ func (h *StatisticsHTTPHandler) GetStatistics(rw http.ResponseWriter,r *http.Req
 	}
 
 	response := toDTOFromDomain(statistics)
-	
-	responseHandler.JSONResponse(response,http.StatusOK)
+
+	responseHandler.JSONResponse(response, http.StatusOK)
 }
 
-
-func toDTOFromDomain(statistics domain.Statistics) GetStatisticsResponse{
+func toDTOFromDomain(statistics domain.Statistics) GetStatisticsResponse {
 	var avgTime *string
-	if statistics.TasksAverageCompletionTime != nil{
-		Duration :=statistics.TasksAverageCompletionTime.String()
+	if statistics.TasksAverageCompletionTime != nil {
+		Duration := statistics.TasksAverageCompletionTime.String()
 		avgTime = &Duration
 	}
 	return GetStatisticsResponse{
-		TasksCreated: statistics.TasksCreated,
-		TasksComplited: statistics.TasksComplited,
-		TasksComplitedRate: statistics.TasksComplitedRate,
+		TasksCreated:               statistics.TasksCreated,
+		TasksComplited:             statistics.TasksComplited,
+		TasksComplitedRate:         statistics.TasksComplitedRate,
 		TasksAverageCompletionTime: avgTime,
 	}
 }
 
-func getUserIdFromToQueryParams(r *http.Request)(*int, *time.Time, *time.Time, error){
-	const(
+func getUserIdFromToQueryParams(r *http.Request) (*int, *time.Time, *time.Time, error) {
+	const (
 		userIDQueryParamKey = "user_id"
-		fromQueryParamKey = "from"
-		toQueryParamKey = "to"
+		fromQueryParamKey   = "from"
+		toQueryParamKey     = "to"
 	)
 
-	userID, err := core_http_request.GetIntQueryParam(r,userIDQueryParamKey)
-	if err != nil{
+	userID, err := core_http_request.GetIntQueryParam(r, userIDQueryParamKey)
+	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get 'user_id' query param: %w", err)
 	}
 
-	from, err := core_http_request.GetDateQueryParam(r,fromQueryParamKey)
-	if err != nil{
+	from, err := core_http_request.GetDateQueryParam(r, fromQueryParamKey)
+	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get 'from' query param: %w", err)
 	}
 
-	to, err := core_http_request.GetDateQueryParam(r,toQueryParamKey)
-	if err != nil{
+	to, err := core_http_request.GetDateQueryParam(r, toQueryParamKey)
+	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get 'to' query param: %w", err)
-	}	
+	}
 
-	return  userID, from, to, nil
+	return userID, from, to, nil
 }
