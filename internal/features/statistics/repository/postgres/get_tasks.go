@@ -19,8 +19,8 @@ func (r *StatisticsRepository) GetTasks(
 	defer cancel()
 
 	var queryBuilder strings.Builder
-	
-	queryBuilder.WriteString( `
+
+	queryBuilder.WriteString(`
 	SELECT id, version, title, description, completed, created_at, completed_at, author_user_id
 	FROM todoapp.tasks
 	`)
@@ -29,8 +29,8 @@ func (r *StatisticsRepository) GetTasks(
 	conditions := []string{}
 
 	if userID != nil {
-    conditions = append(conditions, fmt.Sprintf("author_user_id=$%d", len(args)+1))
-    args = append(args, userID)
+		conditions = append(conditions, fmt.Sprintf("author_user_id=$%d", len(args)+1))
+		args = append(args, userID)
 	}
 
 	if from != nil {
@@ -44,7 +44,7 @@ func (r *StatisticsRepository) GetTasks(
 	}
 
 	if len(conditions) > 0 {
-		queryBuilder.WriteString( " WHERE " + strings.Join(conditions, " AND "))
+		queryBuilder.WriteString(" WHERE " + strings.Join(conditions, " AND "))
 	}
 
 	queryBuilder.WriteString(" ORDER BY id ASC ")
