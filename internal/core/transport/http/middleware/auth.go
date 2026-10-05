@@ -51,7 +51,7 @@ func TelegramAuth(config core_auth.Config, resolver UserResolver) Middleware {
 // LocalAuth выполняет все запросы от имени заданного аккаунта Telegram с правами
 // администратора. Используется только на локальном адресе (127.0.0.1).
 func LocalAuth(telegramID int64, resolver UserResolver) Middleware {
-	tgUser := core_auth.TelegramUser{ID: telegramID, FirstName: "Локальный", LastName: "пользователь"}
+	tgUser := core_auth.TelegramUser{ID: telegramID, FirstName: core_auth.LocalUserFullName}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

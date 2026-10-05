@@ -15,6 +15,246 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/lists": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Списки задач текущего пользователя со счётчиками. Список по умолчанию идёт первым и создаётся автоматически. Администратор может передать user_id",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Мои списки",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Чьи списки показать (только для администратора)",
+                        "name": "user_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_features_lists_transport_http.ListSummaryDTOResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Создать список",
+                "parameters": [
+                    {
+                        "description": "Новый список",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.CreateListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.ListDTOResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/lists/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Удаляет список вместе со всеми его задачами. Список по умолчанию удалить нельзя (409)",
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Удалить список",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID списка",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Список удалён"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Список по умолчанию",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Название и цвет. Необязательное поле 'version' защищает от одновременного изменения (409)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Изменить список",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID списка",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Изменения",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.PatchListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.ListDTOResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/me": {
             "get": {
                 "security": [
@@ -116,7 +356,7 @@ const docTemplate = `{
                         "TelegramInitData": []
                     }
                 ],
-                "description": "Просмотр списка задач с опциональной фильтрацией по автору и пагинацией",
+                "description": "Сначала невыполненные, по ближайшему сроку; без срока — в конце",
                 "produces": [
                     "application/json"
                 ],
@@ -127,8 +367,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Фильтрация задач по ID автора",
+                        "description": "Фильтрация задач по ID автора (только для администратора)",
                         "name": "user_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Задачи одного списка",
+                        "name": "list_id",
                         "in": "query"
                     },
                     {
@@ -754,9 +1000,152 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_features_lists_transport_http.CreateListRequest": {
+            "type": "object",
+            "required": [
+                "color",
+                "title"
+            ],
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "enum": [
+                        "green",
+                        "violet",
+                        "coral",
+                        "blue",
+                        "pink",
+                        "amber"
+                    ],
+                    "example": "green"
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1,
+                    "example": "Дом"
+                }
+            }
+        },
+        "internal_features_lists_transport_http.ListDTOResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "enum": [
+                        "green",
+                        "violet",
+                        "coral",
+                        "blue",
+                        "pink",
+                        "amber"
+                    ],
+                    "example": "green"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "is_default": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "owner_user_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Дом"
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "internal_features_lists_transport_http.ListSummaryDTOResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "enum": [
+                        "green",
+                        "violet",
+                        "coral",
+                        "blue",
+                        "pink",
+                        "amber"
+                    ],
+                    "example": "green"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "is_default": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "open_tasks": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "owner_user_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Дом"
+                },
+                "total_tasks": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "internal_features_lists_transport_http.PatchListRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "example": "amber"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Дача"
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
         "internal_features_statistics_transport_http.GetStatisticsResponse": {
             "type": "object",
             "properties": {
+                "lists": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_features_statistics_transport_http.ListStatisticsResponse"
+                    }
+                },
+                "tasks_average_completion_seconds": {
+                    "description": "Секунды — чтобы фронт мог показать «1 день 4 ч», а не разбирать строку Go.",
+                    "type": "integer",
+                    "example": 90
+                },
                 "tasks_average_completion_time": {
                     "type": "string",
                     "example": "1m30s"
@@ -765,13 +1154,50 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 10
                 },
+                "tasks_completed_on_time": {
+                    "type": "integer",
+                    "example": 5
+                },
                 "tasks_completed_rate": {
                     "type": "number",
                     "example": 20
                 },
+                "tasks_completed_with_due": {
+                    "type": "integer",
+                    "example": 6
+                },
                 "tasks_created": {
                     "type": "integer",
                     "example": 50
+                },
+                "tasks_on_time_rate": {
+                    "type": "number",
+                    "example": 83.3
+                }
+            }
+        },
+        "internal_features_statistics_transport_http.ListStatisticsResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "example": "green"
+                },
+                "list_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "tasks_completed": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "tasks_created": {
+                    "type": "integer",
+                    "example": 9
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Дом"
                 }
             }
         },
@@ -792,6 +1218,21 @@ const docTemplate = `{
                     "maxLength": 1000,
                     "minLength": 1,
                     "example": "2 литра, 3.2%"
+                },
+                "due_all_day": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "due_at": {
+                    "description": "Срок с часовым поясом. Для срока «на весь день» — конец дня по времени пользователя.",
+                    "type": "string",
+                    "example": "2026-10-05T18:00:00+03:00"
+                },
+                "list_id": {
+                    "description": "Не указан — список по умолчанию автора.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 3
                 },
                 "title": {
                     "type": "string",
@@ -819,7 +1260,16 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "due_all_day": {
+                    "type": "boolean"
+                },
+                "due_at": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "integer"
+                },
+                "list_id": {
                     "type": "integer"
                 },
                 "title": {
@@ -848,7 +1298,16 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "due_all_day": {
+                    "type": "boolean"
+                },
+                "due_at": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "integer"
+                },
+                "list_id": {
                     "type": "integer"
                 },
                 "title": {
@@ -869,6 +1328,19 @@ const docTemplate = `{
                 "description": {
                     "type": "string",
                     "example": "2 литра"
+                },
+                "due_all_day": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "due_at": {
+                    "description": "null снимает срок",
+                    "type": "string",
+                    "example": "2026-10-06T10:00:00+03:00"
+                },
+                "list_id": {
+                    "type": "integer",
+                    "example": 3
                 },
                 "title": {
                     "type": "string",
@@ -898,7 +1370,16 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "due_all_day": {
+                    "type": "boolean"
+                },
+                "due_at": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "integer"
+                },
+                "list_id": {
                     "type": "integer"
                 },
                 "title": {
@@ -927,7 +1408,16 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "due_all_day": {
+                    "type": "boolean"
+                },
+                "due_at": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "integer"
+                },
+                "list_id": {
                     "type": "integer"
                 },
                 "title": {

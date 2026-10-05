@@ -17,6 +17,14 @@ func (s *TasksService) PatchTask(
 		return domain.Task{}, err
 	}
 
+	if patch.ListID.Set && patch.ListID.Value != nil {
+		listID, err := s.resolveTaskList(ctx, *patch.ListID.Value, task.AuthorUserID)
+		if err != nil {
+			return domain.Task{}, err
+		}
+		patch.ListID.Value = &listID
+	}
+
 	if err := task.ApplyPatch(patch); err != nil {
 		return domain.Task{}, fmt.Errorf("apply task patch: %w", err)
 	}

@@ -14,6 +14,9 @@ import (
 	core_pgx_pool "github.com/dadqeds/todoapp/internal/core/repository/postgres/pool/pgx"
 	core_http_middleware "github.com/dadqeds/todoapp/internal/core/transport/http/middleware"
 	core_http_server "github.com/dadqeds/todoapp/internal/core/transport/http/server"
+	lists_postgres_repository "github.com/dadqeds/todoapp/internal/features/lists/repository/postgres"
+	lists_service "github.com/dadqeds/todoapp/internal/features/lists/service"
+	lists_transport_http "github.com/dadqeds/todoapp/internal/features/lists/transport/http"
 	statistics_postgres_repository "github.com/dadqeds/todoapp/internal/features/statistics/repository/postgres"
 	statistics_service "github.com/dadqeds/todoapp/internal/features/statistics/service"
 	statistics_transport_http "github.com/dadqeds/todoapp/internal/features/statistics/transport/http"
@@ -87,9 +90,14 @@ func run() error {
 	usersService := users_service.NewUserService(usersRepository)
 	usersTransportHTTP := users_transport_http.NewUsersHTTPHandler(usersService)
 
+	logger.Debug("initializing feature", zap.String("feature", "lists"))
+	listsRepository := lists_postgres_repository.NewListsRepository(pool)
+	listsService := lists_service.NewListsService(listsRepository)
+	listsTransportHTTP := lists_transport_http.NewListsHTTPHandler(listsService)
+
 	logger.Debug("initializing feature", zap.String("feature", "tasks"))
 	tasksRepository := tasks_postgres_repository.NewTasksRepository(pool)
-	tasksService := tasks_service.NewTasksService(tasksRepository)
+	tasksService := tasks_service.NewTasksService(tasksRepository, listsRepository)
 	tasksTransportHTTP := tasks_transport_http.NewTasksHTTPHandler(tasksService)
 
 	logger.Debug("initializing feature", zap.String("feature", "statistics"))
@@ -113,6 +121,7 @@ func run() error {
 
 	apiRoutes := [][]core_http_server.Route{
 		usersTransportHTTP.Routes(),
+		listsTransportHTTP.Routes(),
 		tasksTransportHTTP.Routes(),
 		statisticsTransportHTTP.Routes(),
 	}

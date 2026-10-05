@@ -18,6 +18,12 @@ type Task struct {
 	CompletedAt *time.Time
 
 	AuthorUserID int
+	ListID       int
+
+	// DueAt — срок. При DueAllDay=true это конец дня по времени пользователя,
+	// и показывать нужно только дату.
+	DueAt     *time.Time
+	DueAllDay bool
 }
 
 func NewTask(
@@ -29,6 +35,9 @@ func NewTask(
 	createdAt time.Time,
 	completedAt *time.Time,
 	authorUserID int,
+	listID int,
+	dueAt *time.Time,
+	dueAllDay bool,
 ) Task {
 	return Task{
 		ID:           id,
@@ -39,13 +48,21 @@ func NewTask(
 		CreatedAt:    createdAt,
 		CompletedAt:  completedAt,
 		AuthorUserID: authorUserID,
+		ListID:       listID,
+		DueAt:        dueAt,
+		DueAllDay:    dueAllDay,
 	}
 }
 
+// NewTaskUninitialized создаёт новую задачу. listID=0 означает «список по
+// умолчанию автора»: его подставляет сервис.
 func NewTaskUninitialized(
 	title string,
 	description *string,
 	authorUserID int,
+	listID int,
+	dueAt *time.Time,
+	dueAllDay bool,
 ) Task {
 	return NewTask(
 		UninitializedID,
@@ -56,7 +73,15 @@ func NewTaskUninitialized(
 		time.Now(),
 		nil,
 		authorUserID,
+		listID,
+		dueAt,
+		dueAllDay,
 	)
+}
+
+// IsCompletedOnTime: задача выполнена и не позже срока.
+func (t *Task) IsCompletedOnTime() bool {
+	return t.Completed && t.CompletedAt != nil && t.DueAt != nil && !t.CompletedAt.After(*t.DueAt)
 }
 
 func (t *Task) CompletionDuration() *time.Duration {
@@ -93,6 +118,13 @@ func (t *Task) Validate() error {
 		}
 	}
 
+	if t.DueAt == nil && t.DueAllDay {
+		return fmt.Errorf(
+			"`DueAllDay` requires `DueAt`: %w",
+			core_errors.ErrInvalidArgument,
+		)
+	}
+
 	if t.Completed {
 		if t.CompletedAt == nil {
 			return fmt.Errorf(
@@ -123,30 +155,35 @@ type TaskPatch struct {
 	Title       Nullable[string]
 	Description Nullable[string]
 	Completed   Nullable[bool]
+	ListID      Nullable[int]
+
+	// DueAt=null снимает срок (и DueAllDay вместе с ним).
+	DueAt     Nullable[time.Time]
+	DueAllDay Nullable[bool]
 
 	// ExpectedVersion — версия, которую видел клиент. Если задана и не совпадает
 	// с текущей, патч отклоняется с ErrConflict (оптимистичная блокировка).
 	ExpectedVersion *int
 }
 
-func NewTaskPatch(
-	title Nullable[string],
-	description Nullable[string],
-	completed Nullable[bool],
-	expectedVersion *int,
-) TaskPatch {
-	return TaskPatch{
-		Title:           title,
-		Description:     description,
-		Completed:       completed,
-		ExpectedVersion: expectedVersion,
-	}
-}
-
 func (p *TaskPatch) Validate() error {
 	if p.Title.Set && p.Title.Value == nil {
 		return fmt.Errorf(
 			"'Title' can't be patched to NULL: %w",
+			core_errors.ErrInvalidArgument,
+		)
+	}
+
+	if p.ListID.Set && p.ListID.Value == nil {
+		return fmt.Errorf(
+			"'ListID' can't be patched to NULL: %w",
+			core_errors.ErrInvalidArgument,
+		)
+	}
+
+	if p.DueAllDay.Set && p.DueAllDay.Value == nil {
+		return fmt.Errorf(
+			"'DueAllDay' can't be patched to NULL: %w",
 			core_errors.ErrInvalidArgument,
 		)
 	}
@@ -180,6 +217,21 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 		tmp.Description = patch.Description.Value
 	}
 
+	if patch.ListID.Set {
+		tmp.ListID = *patch.ListID.Value
+	}
+
+	if patch.DueAt.Set {
+		tmp.DueAt = patch.DueAt.Value
+		if tmp.DueAt == nil {
+			tmp.DueAllDay = false
+		}
+	}
+
+	if patch.DueAllDay.Set {
+		tmp.DueAllDay = *patch.DueAllDay.Value
+	}
+
 	if patch.Completed.Set {
 		wasCompleted := tmp.Completed
 		tmp.Completed = *patch.Completed.Value
@@ -200,4 +252,10 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 	*t = tmp
 
 	return nil
+}
+
+// TaskFilter — условия выборки задач; nil-поля не ограничивают выборку.
+type TaskFilter struct {
+	AuthorUserID *int
+	ListID       *int
 }

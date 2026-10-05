@@ -18,7 +18,7 @@ type fakeTasksService struct {
 
 func (f fakeTasksService) DeleteTask(context.Context, int) error { return f.deleteErr }
 
-func (f fakeTasksService) GetTasks(context.Context, *int, *int, *int) ([]domain.Task, error) {
+func (f fakeTasksService) GetTasks(context.Context, domain.TaskFilter, *int, *int) ([]domain.Task, error) {
 	return nil, nil
 }
 

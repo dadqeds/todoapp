@@ -7,18 +7,20 @@ type Statistics struct {
 	TasksCompleted             int
 	TasksCompletedRate         *float64
 	TasksAverageCompletionTime *time.Duration
+
+	// Из выполненных задач со сроком — сколько выполнено не позже срока.
+	TasksCompletedWithDue int
+	TasksCompletedOnTime  int
+	TasksOnTimeRate       *float64
+
+	Lists []ListStatistics
 }
 
-func NewStatistics(
-	tasksCreated int,
-	tasksCompleted int,
-	tasksCompletedRate *float64,
-	tasksAverageCompletionTime *time.Duration,
-) Statistics {
-	return Statistics{
-		TasksCreated:               tasksCreated,
-		TasksCompleted:             tasksCompleted,
-		TasksCompletedRate:         tasksCompletedRate,
-		TasksAverageCompletionTime: tasksAverageCompletionTime,
-	}
+// ListStatistics — счётчики задач одного списка за период.
+type ListStatistics struct {
+	ListID         int
+	Title          string
+	Color          string
+	TasksCreated   int
+	TasksCompleted int
 }

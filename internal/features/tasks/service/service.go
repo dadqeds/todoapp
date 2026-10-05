@@ -8,6 +8,13 @@ import (
 
 type TasksService struct {
 	tasksRepository TasksRepository
+	listsRepository ListsRepository
+}
+
+// ListsRepository — то, что сервису задач нужно знать о списках.
+type ListsRepository interface {
+	GetList(ctx context.Context, id int) (domain.List, error)
+	GetOrCreateDefaultList(ctx context.Context, ownerUserID int) (domain.List, error)
 }
 
 type TasksRepository interface {
@@ -18,7 +25,7 @@ type TasksRepository interface {
 
 	GetTasks(
 		ctx context.Context,
-		userID *int,
+		filter domain.TaskFilter,
 		limit int,
 		offset int,
 	) ([]domain.Task, error)
@@ -42,8 +49,10 @@ type TasksRepository interface {
 
 func NewTasksService(
 	tasksRepository TasksRepository,
+	listsRepository ListsRepository,
 ) *TasksService {
 	return &TasksService{
 		tasksRepository: tasksRepository,
+		listsRepository: listsRepository,
 	}
 }

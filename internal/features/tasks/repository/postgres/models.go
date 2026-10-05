@@ -6,7 +6,7 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-const taskColumns = `id, version, title, description, completed, created_at, completed_at, author_user_id`
+const taskColumns = `id, version, title, description, completed, created_at, completed_at, author_user_id, list_id, due_at, due_all_day`
 
 type TaskModel struct {
 	ID           int
@@ -17,6 +17,9 @@ type TaskModel struct {
 	CreatedAt    time.Time
 	CompletedAt  *time.Time
 	AuthorUserID int
+	ListID       int
+	DueAt        *time.Time
+	DueAllDay    bool
 }
 
 // scanner покрывает и core_postgres_pool.Row, и core_postgres_pool.Rows.
@@ -36,6 +39,9 @@ func scanTaskModel(s scanner) (TaskModel, error) {
 		&taskModel.CreatedAt,
 		&taskModel.CompletedAt,
 		&taskModel.AuthorUserID,
+		&taskModel.ListID,
+		&taskModel.DueAt,
+		&taskModel.DueAllDay,
 	)
 
 	return taskModel, err
@@ -51,6 +57,9 @@ func taskDomainFromModel(taskModel TaskModel) domain.Task {
 		taskModel.CreatedAt,
 		taskModel.CompletedAt,
 		taskModel.AuthorUserID,
+		taskModel.ListID,
+		taskModel.DueAt,
+		taskModel.DueAllDay,
 	)
 }
 

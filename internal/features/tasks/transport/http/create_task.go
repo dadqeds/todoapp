@@ -2,6 +2,7 @@ package tasks_transport_http
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/dadqeds/todoapp/internal/core/domain"
 	core_logger "github.com/dadqeds/todoapp/internal/core/logger"
@@ -10,10 +11,15 @@ import (
 )
 
 type CreateTaskRequest struct {
-	Title       string  `json:"title"          validate:"required,min=1,max=100"   example:"Купить молоко"`
-	Description *string `json:"description"    validate:"omitempty,min=1,max=1000" example:"2 литра, 3.2%"`
+	Title       string  `json:"title"       validate:"required,min=1,max=100"   example:"Купить молоко"`
+	Description *string `json:"description" validate:"omitempty,min=1,max=1000" example:"2 литра, 3.2%"`
 	// Учитывается только для администратора, остальным автором ставится текущий пользователь.
-	AuthorUserID int `json:"author_user_id" validate:"omitempty,min=1"          example:"1"`
+	AuthorUserID int `json:"author_user_id" validate:"omitempty,min=1" example:"1"`
+	// Не указан — список по умолчанию автора.
+	ListID int `json:"list_id" validate:"omitempty,min=1" example:"3"`
+	// Срок с часовым поясом. Для срока «на весь день» — конец дня по времени пользователя.
+	DueAt     *time.Time `json:"due_at"      example:"2026-10-05T18:00:00+03:00"`
+	DueAllDay bool       `json:"due_all_day" example:"false"`
 }
 
 type CreateTaskResponse TaskDTOResponse
@@ -51,6 +57,9 @@ func (h *TasksHTTPHandler) CreateTask(rw http.ResponseWriter, r *http.Request) {
 		request.Title,
 		request.Description,
 		request.AuthorUserID,
+		request.ListID,
+		request.DueAt,
+		request.DueAllDay,
 	)
 
 	taskDomain, err := h.tasksService.CreateTask(ctx, taskDomain)

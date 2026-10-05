@@ -16,6 +16,22 @@ type GetStatisticsResponse struct {
 	TasksCompleted             int      `json:"tasks_completed"                      example:"10"`
 	TasksCompletedRate         *float64 `json:"tasks_completed_rate"                 example:"20"`
 	TasksAverageCompletionTime *string  `json:"tasks_average_completion_time"        example:"1m30s"`
+	// Секунды — чтобы фронт мог показать «1 день 4 ч», а не разбирать строку Go.
+	TasksAverageCompletionSeconds *int64 `json:"tasks_average_completion_seconds" example:"90"`
+
+	TasksCompletedWithDue int      `json:"tasks_completed_with_due" example:"6"`
+	TasksCompletedOnTime  int      `json:"tasks_completed_on_time"  example:"5"`
+	TasksOnTimeRate       *float64 `json:"tasks_on_time_rate"       example:"83.3"`
+
+	Lists []ListStatisticsResponse `json:"lists"`
+}
+
+type ListStatisticsResponse struct {
+	ListID         int    `json:"list_id"         example:"3"`
+	Title          string `json:"title"           example:"Дом"`
+	Color          string `json:"color"           example:"green"`
+	TasksCreated   int    `json:"tasks_created"   example:"9"`
+	TasksCompleted int    `json:"tasks_completed" example:"7"`
 }
 
 // GetStatistics	godoc
@@ -66,11 +82,33 @@ func toDTOFromDomain(statistics domain.Statistics) GetStatisticsResponse {
 		duration := statistics.TasksAverageCompletionTime.Round(time.Second).String()
 		avgTime = &duration
 	}
+	var avgSeconds *int64
+	if statistics.TasksAverageCompletionTime != nil {
+		sec := int64(statistics.TasksAverageCompletionTime.Round(time.Second) / time.Second)
+		avgSeconds = &sec
+	}
+
+	lists := make([]ListStatisticsResponse, len(statistics.Lists))
+	for i, l := range statistics.Lists {
+		lists[i] = ListStatisticsResponse{
+			ListID:         l.ListID,
+			Title:          l.Title,
+			Color:          l.Color,
+			TasksCreated:   l.TasksCreated,
+			TasksCompleted: l.TasksCompleted,
+		}
+	}
+
 	return GetStatisticsResponse{
-		TasksCreated:               statistics.TasksCreated,
-		TasksCompleted:             statistics.TasksCompleted,
-		TasksCompletedRate:         statistics.TasksCompletedRate,
-		TasksAverageCompletionTime: avgTime,
+		TasksAverageCompletionSeconds: avgSeconds,
+		TasksCompletedWithDue:         statistics.TasksCompletedWithDue,
+		TasksCompletedOnTime:          statistics.TasksCompletedOnTime,
+		TasksOnTimeRate:               statistics.TasksOnTimeRate,
+		Lists:                         lists,
+		TasksCreated:                  statistics.TasksCreated,
+		TasksCompleted:                statistics.TasksCompleted,
+		TasksCompletedRate:            statistics.TasksCompletedRate,
+		TasksAverageCompletionTime:    avgTime,
 	}
 }
 

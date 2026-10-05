@@ -17,6 +17,10 @@ import (
 	core_errors "github.com/dadqeds/todoapp/internal/core/errors"
 )
 
+// LocalUserFullName — имя, с которым создаётся пользователь при первом заходе
+// на локальный адрес, где настоящее имя из Telegram неизвестно.
+const LocalUserFullName = "Локальный пользователь"
+
 // TelegramUser — поля пользователя из initData, которые нам нужны.
 type TelegramUser struct {
 	ID        int64  `json:"id"`

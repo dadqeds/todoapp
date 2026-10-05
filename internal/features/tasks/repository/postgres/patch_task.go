@@ -25,8 +25,11 @@ func (r *TasksRepository) PatchTask(
 		description=$2,
 		completed=$3,
 		completed_at=$4,
+		list_id=$5,
+		due_at=$6,
+		due_all_day=$7,
 		version=version + 1
-	WHERE id=$5 AND version=$6 
+	WHERE id=$8 AND version=$9 
 
 	RETURNING ` + taskColumns + `;
 	`
@@ -38,6 +41,9 @@ func (r *TasksRepository) PatchTask(
 		task.Description,
 		task.Completed,
 		task.CompletedAt,
+		task.ListID,
+		task.DueAt,
+		task.DueAllDay,
 		id,
 		task.Version,
 	)
