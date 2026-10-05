@@ -64,7 +64,24 @@ UPDATE todoapp.users SET telegram_id = <ваш id> WHERE id = <id пользов
 | `todoapp-run` | Запустить приложение локально (`go run`) |
 | `todoapp-deploy` / `todoapp-undeploy` | Собрать и запустить / остановить контейнер |
 | `swagger-gen` | Перегенерировать `docs/` |
+| `db-backup` | Сохранить копию базы в `out/backups/` (хранятся последние `BACKUP_KEEP`, по умолчанию 30) |
+| `db-restore file=…` | Восстановить базу из копии (спросит подтверждение) |
 | `test`, `vet`, `lint`, `check` | Тесты, `go vet`, golangci-lint, vet + тесты |
+
+## Резервные копии
+
+```bash
+make db-backup
+make db-restore file=out/backups/todoapp-2026-10-05_19-35-09.dump
+```
+
+Копии лежат в `out/backups/` в формате `pg_dump --format=custom`. Восстановление заменяет все текущие данные содержимым копии в одной транзакции: если что-то пойдёт не так, база останется как была.
+
+Делать копию раз в день автоматически (macOS/Linux, `crontab -e`):
+
+```
+0 3 * * * cd /path/to/todoapp && make db-backup >> out/backups/cron.log 2>&1
+```
 
 ## Конфигурация
 
