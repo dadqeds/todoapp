@@ -134,6 +134,10 @@ definitions:
         items:
           $ref: '#/definitions/internal_features_lists_transport_http.ListMemberDTO'
         type: array
+      notify_changes:
+        description: Сообщать ли текущему пользователю об изменениях в этом списке.
+        example: true
+        type: boolean
       open_tasks:
         example: 3
         type: integer
@@ -167,6 +171,14 @@ definitions:
       version:
         example: 1
         type: integer
+    type: object
+  internal_features_lists_transport_http.SetNotifyChangesRequest:
+    properties:
+      notify_changes:
+        example: false
+        type: boolean
+    required:
+    - notify_changes
     type: object
   internal_features_statistics_transport_http.GetStatisticsResponse:
     properties:
@@ -984,6 +996,44 @@ paths:
       security:
       - TelegramInitData: []
       summary: Исключить участника или выйти из списка
+      tags:
+      - lists
+  /lists/{id}/notifications:
+    put:
+      consumes:
+      - application/json
+      description: 'Личный переключатель владельца или участника: бот пишет, когда
+        другие добавляют или выполняют задачи. По умолчанию включён'
+      parameters:
+      - description: ID списка
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Включить или выключить
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_features_lists_transport_http.SetNotifyChangesRequest'
+      responses:
+        "204":
+          description: Сохранено
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Сообщать об изменениях в списке
       tags:
       - lists
   /lists/join:

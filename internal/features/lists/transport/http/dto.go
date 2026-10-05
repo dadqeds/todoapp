@@ -32,6 +32,8 @@ type ListSummaryDTOResponse struct {
 	TotalTasks int             `json:"total_tasks" example:"5"`
 	Role       string          `json:"role"        example:"owner" enums:"owner,member"`
 	Members    []ListMemberDTO `json:"members"`
+	// Сообщать ли текущему пользователю об изменениях в этом списке.
+	NotifyChanges bool `json:"notify_changes" example:"true"`
 }
 
 // listDTO показывает приглашение только тому, кто может им управлять.
@@ -69,5 +71,6 @@ func (h *ListsHTTPHandler) listSummaryDTO(s domain.ListSummary) ListSummaryDTORe
 		TotalTasks:      s.TotalTasks,
 		Role:            s.Role,
 		Members:         members,
+		NotifyChanges:   s.NotifyChanges,
 	}
 }

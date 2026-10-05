@@ -7,8 +7,9 @@ import (
 )
 
 type TasksService struct {
-	tasksRepository TasksRepository
-	listsRepository ListsRepository
+	tasksRepository   TasksRepository
+	listsRepository   ListsRepository
+	changesRepository ListChangesRepository
 }
 
 // ListsRepository — то, что сервису задач нужно знать о списках.
@@ -16,6 +17,12 @@ type ListsRepository interface {
 	GetList(ctx context.Context, id int) (domain.List, error)
 	GetOrCreateDefaultList(ctx context.Context, ownerUserID int) (domain.List, error)
 	IsListMember(ctx context.Context, listID int, userID int) (bool, error)
+}
+
+// ListChangesRepository ставит в очередь уведомления остальным участникам
+// списка: кто-то добавил или выполнил задачу.
+type ListChangesRepository interface {
+	EnqueueListChange(ctx context.Context, change domain.ListChange) error
 }
 
 type TasksRepository interface {
@@ -58,9 +65,11 @@ type TasksRepository interface {
 func NewTasksService(
 	tasksRepository TasksRepository,
 	listsRepository ListsRepository,
+	changesRepository ListChangesRepository,
 ) *TasksService {
 	return &TasksService{
-		tasksRepository: tasksRepository,
-		listsRepository: listsRepository,
+		tasksRepository:   tasksRepository,
+		listsRepository:   listsRepository,
+		changesRepository: changesRepository,
 	}
 }

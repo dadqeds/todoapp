@@ -56,6 +56,10 @@ func (s *TasksService) PatchTask(
 		return domain.Task{}, fmt.Errorf("patch task: %w", err)
 	}
 
+	if !wasCompleted && patchedTask.Completed {
+		s.enqueueListChange(ctx, actor, patchedTask, domain.ListChangeTaskCompleted)
+	}
+
 	// Без транзакции: если создать следующую не удалось, выполнение уже
 	// сохранено, а ошибка вернётся клиенту.
 	if next != nil {

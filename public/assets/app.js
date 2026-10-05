@@ -935,8 +935,16 @@ function membersBlock(list) {
       }</div>`;
     })
     .join("");
+  // Переключатель у каждого свой: и у владельца, и у участников.
+  const notify = isShared(list)
+    ? `<div class="rows" style="background:var(--field);margin-top:8px"><div class="row">
+        <span class="row-main">Сообщать об изменениях<div class="row-sub">когда другие добавляют или выполняют задачи</div></span>
+        <button class="switch" type="button" role="switch" id="notifySwitch" aria-checked="${list.notify_changes !== false}" aria-label="Сообщать об изменениях"></button>
+      </div></div>`
+    : "";
   return `<span class="field-label">Участники</span>
     <div class="rows" style="background:var(--field)">${rows}</div>
+    ${notify}
     ${owner ? '<div id="inviteBlock" style="margin-top:8px"></div>' : ""}`;
 }
 
@@ -1004,6 +1012,25 @@ function openListSheet(list = null) {
     });
   }
   if (!owner) $("#listLeave").onclick = () => leaveList(list);
+  if ($("#notifySwitch")) $("#notifySwitch").onclick = () => toggleListNotify(list);
+}
+
+async function toggleListNotify(list) {
+  const on = list.notify_changes === false;
+  if (on && !(await requestWriteAccess())) {
+    toast("Без разрешения бот не сможет присылать сообщения.", true);
+    return;
+  }
+  const sw = $("#notifySwitch");
+  sw.setAttribute("aria-checked", String(on));
+  try {
+    await api(`/lists/${list.id}/notifications`, send("PUT", { notify_changes: on }));
+    list.notify_changes = on;
+    toast(on ? "Бот напишет, когда в списке что-то изменится" : "Сообщения об изменениях выключены");
+  } catch (err) {
+    sw.setAttribute("aria-checked", String(!on));
+    toast(err.message, true);
+  }
 }
 
 async function createInvite(list) {
@@ -1524,8 +1551,23 @@ async function start() {
   $("#tabbar").hidden = false;
   await syncTimezone();
   await joinFromLink();
+  await openListFromLink();
   await switchTab("tasks");
   await openTaskFromLink();
+}
+
+// Кнопка «Открыть список» в сообщении об изменениях ведёт на t.me/<бот>?startapp=list_<id>.
+async function openListFromLink() {
+  const param = (inTelegram ? tg.initDataUnsafe?.start_param : null) || "";
+  const id = param.startsWith("list_") ? Number(param.slice(5)) : Number(new URLSearchParams(location.search).get("list"));
+  if (!id) return;
+  try {
+    await loadLists();
+  } catch {
+    return;
+  }
+  if (listById(id)) state.listFilter = id;
+  else toast("Список не найден — возможно, вас из него исключили.", true);
 }
 
 // Кнопка «Открыть задачу» в напоминании ведёт на t.me/<бот>?startapp=task_<id>.

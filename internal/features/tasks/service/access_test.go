@@ -65,8 +65,18 @@ func (fakeListsRepository) GetOrCreateDefaultList(_ context.Context, owner int) 
 	return domain.List{}, core_errors.ErrNotFound
 }
 
+// fakeChanges запоминает события для уведомлений участникам списков.
+type fakeChanges struct {
+	changes []domain.ListChange
+}
+
+func (f *fakeChanges) EnqueueListChange(_ context.Context, c domain.ListChange) error {
+	f.changes = append(f.changes, c)
+	return nil
+}
+
 func newService(repo *fakeTasksRepository) *TasksService {
-	return NewTasksService(repo, fakeListsRepository{})
+	return NewTasksService(repo, fakeListsRepository{}, &fakeChanges{})
 }
 
 func (f *fakeTasksRepository) GetTask(_ context.Context, id int) (domain.Task, error) {

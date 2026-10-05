@@ -17,6 +17,7 @@ type fakeRepo struct {
 	ensuredFor   []int
 	gotOwner     *int
 	createdOwner int
+	notify       map[[2]int]bool
 }
 
 // Пользователь 10 владеет списками 1 и 2, 20 — списком 3, в котором участвует 30.
@@ -97,6 +98,17 @@ func (f *fakeRepo) PatchList(_ context.Context, _ int, l domain.List) (domain.Li
 
 func (f *fakeRepo) DeleteList(_ context.Context, id int) error {
 	f.deleted = append(f.deleted, id)
+	return nil
+}
+
+func (f *fakeRepo) SetNotifyChanges(_ context.Context, listID, userID int, enabled bool) error {
+	if f.lists[listID].OwnerUserID != userID && !f.members[listID][userID] {
+		return core_errors.ErrNotFound
+	}
+	if f.notify == nil {
+		f.notify = map[[2]int]bool{}
+	}
+	f.notify[[2]int{listID, userID}] = enabled
 	return nil
 }
 
@@ -242,5 +254,26 @@ func TestRemoveMember(t *testing.T) {
 	}
 	if err := s.RemoveMember(asActor(20, false), 3, 31); err != nil || repo.members[3][31] {
 		t.Errorf("owner removes member: err %v, members %v", err, repo.members[3])
+	}
+}
+
+func TestSetNotifyChanges(t *testing.T) {
+	repo := newRepo()
+	s := NewListsService(repo)
+
+	if err := s.SetNotifyChanges(asActor(30, false), 3, false); err != nil {
+		t.Fatalf("member: %v", err)
+	}
+	if err := s.SetNotifyChanges(asActor(20, false), 3, false); err != nil {
+		t.Fatalf("owner: %v", err)
+	}
+	if repo.notify[[2]int{3, 30}] || repo.notify[[2]int{3, 20}] {
+		t.Fatalf("notify = %v, want both off", repo.notify)
+	}
+	if _, ok := repo.notify[[2]int{3, 40}]; ok {
+		t.Fatal("stranger changed setting")
+	}
+	if err := s.SetNotifyChanges(asActor(40, false), 3, true); !errors.Is(err, core_errors.ErrNotFound) {
+		t.Fatalf("stranger: err = %v, want ErrNotFound", err)
 	}
 }

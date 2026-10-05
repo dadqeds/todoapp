@@ -45,5 +45,7 @@ func (s *TasksService) CreateTask(
 		)
 	}
 
+	s.enqueueListChange(ctx, actor, task, domain.ListChangeTaskAdded)
+
 	return task, nil
 }

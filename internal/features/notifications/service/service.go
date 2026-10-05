@@ -1,5 +1,6 @@
-// Package notifications_service отправляет напоминания о сроках и утреннюю
-// сводку через бота. Работает фоном: раз в минуту проверяет, что пора отправить.
+// Package notifications_service отправляет через бота напоминания о сроках,
+// утреннюю сводку и изменения в общих списках. Работает фоном: раз в минуту
+// проверяет, что пора отправить.
 package notifications_service
 
 import (
@@ -36,6 +37,24 @@ type DigestTask struct {
 	DueAllDay bool
 }
 
+// ListChange — событие из очереди: кто что сделал с задачей.
+type ListChange struct {
+	ID        int64
+	ActorName string
+	Kind      string
+	TaskTitle string
+	CreatedAt time.Time
+}
+
+// ListChangeBatch — накопившиеся изменения одного списка для одного получателя.
+type ListChangeBatch struct {
+	ListID          int
+	ListTitle       string
+	RecipientUserID int
+	ChatID          int64
+	Changes         []ListChange
+}
+
 type Repository interface {
 	GetPendingReminders(ctx context.Context, horizon time.Time) ([]PendingReminder, error)
 	ClaimReminder(ctx context.Context, taskID int) (bool, error)
@@ -43,6 +62,11 @@ type Repository interface {
 	GetDigestRecipients(ctx context.Context) ([]DigestRecipient, error)
 	ClaimDigest(ctx context.Context, userID int, localDate time.Time) (bool, error)
 	GetDigestTasks(ctx context.Context, userID int, until time.Time) ([]DigestTask, error)
+
+	GetPendingListChanges(ctx context.Context, readyBefore time.Time) ([]ListChangeBatch, error)
+	ClaimListChanges(ctx context.Context, ids []int64) (bool, error)
+	ReleaseListChanges(ctx context.Context, ids []int64) error
+	DeleteListChangesBefore(ctx context.Context, before time.Time) error
 }
 
 type Sender interface {
@@ -97,6 +121,7 @@ func (n *Notifier) Tick(ctx context.Context) {
 	now := n.now()
 	n.sendReminders(ctx, now)
 	n.sendDigests(ctx, now)
+	n.sendListChanges(ctx, now)
 }
 
 func loadLocation(name string) *time.Location {

@@ -37,6 +37,12 @@ type fakeRepo struct {
 	recipients []DigestRecipient
 	digestDays map[int]string
 	tasks      []DigestTask
+
+	batches         []ListChangeBatch
+	readyBefore     time.Time
+	sentChanges     map[int64]bool
+	releasedChanges []int64
+	cleanedTo       time.Time
 }
 
 func (f *fakeRepo) GetPendingReminders(_ context.Context, horizon time.Time) ([]PendingReminder, error) {

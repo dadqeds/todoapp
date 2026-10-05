@@ -484,6 +484,64 @@
                 }
             }
         },
+        "/lists/{id}/notifications": {
+            "put": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Личный переключатель владельца или участника: бот пишет, когда другие добавляют или выполняют задачи. По умолчанию включён",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Сообщать об изменениях в списке",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID списка",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Включить или выключить",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.SetNotifyChangesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Сохранено"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/me": {
             "get": {
                 "security": [
@@ -1669,6 +1727,11 @@
                         "$ref": "#/definitions/internal_features_lists_transport_http.ListMemberDTO"
                     }
                 },
+                "notify_changes": {
+                    "description": "Сообщать ли текущему пользователю об изменениях в этом списке.",
+                    "type": "boolean",
+                    "example": true
+                },
                 "open_tasks": {
                     "type": "integer",
                     "example": 3
@@ -1713,6 +1776,18 @@
                 "version": {
                     "type": "integer",
                     "example": 1
+                }
+            }
+        },
+        "internal_features_lists_transport_http.SetNotifyChangesRequest": {
+            "type": "object",
+            "required": [
+                "notify_changes"
+            ],
+            "properties": {
+                "notify_changes": {
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },

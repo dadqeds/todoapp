@@ -144,3 +144,44 @@ func (h *ListsHTTPHandler) RemoveMember(rw http.ResponseWriter, r *http.Request)
 
 	responseHandler.NoContentResponse()
 }
+
+type SetNotifyChangesRequest struct {
+	NotifyChanges *bool `json:"notify_changes" validate:"required" example:"false"`
+}
+
+// SetNotifyChanges godoc
+// @Summary 		Сообщать об изменениях в списке
+// @Description 	Личный переключатель владельца или участника: бот пишет, когда другие добавляют или выполняют задачи. По умолчанию включён
+// @Tags 			lists
+// @Accept 			json
+// @Security 		TelegramInitData
+// @Param 			id path int true "ID списка"
+// @Param 			request body SetNotifyChangesRequest true "Включить или выключить"
+// @Success 		204 "Сохранено"
+// @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
+// @Failure 		404 {object} core_http_response.ErrorResponse "Not found"
+// @Router 			/lists/{id}/notifications [put]
+func (h *ListsHTTPHandler) SetNotifyChanges(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	responseHandler := core_http_response.NewHTTPResponseHandler(core_logger.FromContext(ctx), rw)
+
+	id, err := core_http_request.GetIntPathValue(r, "id")
+	if err != nil {
+		responseHandler.ErrorResponse(err, "failed to get list id path value")
+		return
+	}
+
+	var request SetNotifyChangesRequest
+	if err := core_http_request.DecodeAndValidateRequest(r, &request); err != nil {
+		responseHandler.ErrorResponse(err, "failed to decode and validate HTTP request")
+		return
+	}
+
+	if err := h.listsService.SetNotifyChanges(ctx, id, *request.NotifyChanges); err != nil {
+		responseHandler.ErrorResponse(err, "failed to set notify changes")
+		return
+	}
+
+	responseHandler.NoContentResponse()
+}

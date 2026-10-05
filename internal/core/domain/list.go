@@ -133,6 +133,9 @@ type ListSummary struct {
 	// Role — роль текущего пользователя в списке.
 	Role    string
 	Members []ListMember
+
+	// NotifyChanges — сообщать ли текущему пользователю об изменениях в списке.
+	NotifyChanges bool
 }
 
 // IsShared: в списке есть кто-то кроме владельца.
