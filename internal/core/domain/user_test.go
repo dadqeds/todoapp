@@ -55,3 +55,12 @@ func TestUserApplyPatch(t *testing.T) {
 		}
 	})
 }
+
+func TestUserApplyPatchExpectedVersion(t *testing.T) {
+	user := User{Version: 5, FullName: "Ivan"}
+
+	err := user.ApplyPatch(UserPatch{Fullname: set("Petr"), ExpectedVersion: ptr(4)})
+	if !errors.Is(err, core_errors.ErrConflict) {
+		t.Fatalf("err = %v, want ErrConflict", err)
+	}
+}

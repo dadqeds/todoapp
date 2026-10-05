@@ -123,17 +123,23 @@ type TaskPatch struct {
 	Title       Nullable[string]
 	Description Nullable[string]
 	Completed   Nullable[bool]
+
+	// ExpectedVersion — версия, которую видел клиент. Если задана и не совпадает
+	// с текущей, патч отклоняется с ErrConflict (оптимистичная блокировка).
+	ExpectedVersion *int
 }
 
 func NewTaskPatch(
 	title Nullable[string],
 	description Nullable[string],
 	completed Nullable[bool],
+	expectedVersion *int,
 ) TaskPatch {
 	return TaskPatch{
-		Title:       title,
-		Description: description,
-		Completed:   completed,
+		Title:           title,
+		Description:     description,
+		Completed:       completed,
+		ExpectedVersion: expectedVersion,
 	}
 }
 
@@ -158,6 +164,10 @@ func (p *TaskPatch) Validate() error {
 func (t *Task) ApplyPatch(patch TaskPatch) error {
 	if err := patch.Validate(); err != nil {
 		return fmt.Errorf("validate task patch: %w", err)
+	}
+
+	if err := checkExpectedVersion(patch.ExpectedVersion, t.Version); err != nil {
+		return err
 	}
 
 	tmp := *t

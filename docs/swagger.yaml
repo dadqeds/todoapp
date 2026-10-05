@@ -92,6 +92,9 @@ definitions:
       title:
         example: Купить молоко
         type: string
+      version:
+        example: 3
+        type: integer
     type: object
   internal_features_tasks_transport_http.PatchTaskResponse:
     properties:
@@ -184,6 +187,9 @@ definitions:
       phone_number:
         example: "+71112223344"
         type: string
+      version:
+        example: 3
+        type: integer
     type: object
   internal_features_users_transport_http.PatchUserResponse:
     properties:
@@ -394,6 +400,7 @@ paths:
         2. **Явно передано значение**: '"description": "Утром в 06:30 выйти на прогулку с Бобиком"'
         3. **Явно передан null**: '"description": null' - очищает поле в БД (set to NULL)
         Ограничения: 'title' и 'completed' не могут быть выставлены как null
+        Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
       parameters:
       - description: ID изменяемой задачи
         in: path
@@ -557,7 +564,9 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Изменение информации об уже существующем в системе пользователе
+      description: |-
+        Изменение информации об уже существующем в системе пользователе.
+        Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
       parameters:
       - description: ID изменяемого пользователя
         in: path

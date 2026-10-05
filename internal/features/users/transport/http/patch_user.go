@@ -13,13 +13,15 @@ import (
 type PatchUserRequest struct {
 	FullName    core_http_types.Nullable[string] `json:"full_name"       swaggertype:"string" example:"Максим Максимович"`
 	PhoneNumber core_http_types.Nullable[string] `json:"phone_number"    swaggertype:"string" example:"+71112223344"`
+	Version     *int                             `json:"version"         example:"3"`
 }
 
 type PatchUserResponse UserDTOResponse
 
 // PatchUser 		godoc
 // @Summary 		Изменение пользователя
-// @Description		Изменение информации об уже существующем в системе пользователе
+// @Description		Изменение информации об уже существующем в системе пользователе.
+// @Description		Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
 // @Tags 			users
 // @Accept 			json
 // @Produce 		json
@@ -74,5 +76,6 @@ func userPatchFromRequest(request PatchUserRequest) domain.UserPatch {
 	return domain.NewUserPatch(
 		request.FullName.ToDomain(),
 		request.PhoneNumber.ToDomain(),
+		request.Version,
 	)
 }

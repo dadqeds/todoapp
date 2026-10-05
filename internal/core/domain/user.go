@@ -75,15 +75,20 @@ func (u *User) Validate() error {
 type UserPatch struct {
 	Fullname    Nullable[string]
 	PhoneNumber Nullable[string]
+
+	// ExpectedVersion — см. TaskPatch.ExpectedVersion.
+	ExpectedVersion *int
 }
 
 func NewUserPatch(
 	fullName Nullable[string],
 	phoneNumber Nullable[string],
+	expectedVersion *int,
 ) UserPatch {
 	return UserPatch{
-		Fullname:    fullName,
-		PhoneNumber: phoneNumber,
+		Fullname:        fullName,
+		PhoneNumber:     phoneNumber,
+		ExpectedVersion: expectedVersion,
 	}
 }
 
@@ -101,6 +106,10 @@ func (p *UserPatch) Validate() error {
 func (u *User) ApplyPatch(patch UserPatch) error {
 	if err := patch.Validate(); err != nil {
 		return fmt.Errorf("validate user patch: %w", err)
+	}
+
+	if err := checkExpectedVersion(patch.ExpectedVersion, u.Version); err != nil {
+		return err
 	}
 
 	tmp := *u
