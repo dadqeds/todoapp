@@ -12,8 +12,11 @@ import (
 )
 
 func TestMainPageRoute(t *testing.T) {
-	files := fstest.MapFS{"index.html": {Data: []byte("<html>todo</html>")}}
-	h := NewWebHTTPHandler(web_service.NewWebService(web_fs_repository.NewWebRepository(files)))
+	files := fstest.MapFS{
+		"index.html":    {Data: []byte("<html>todo</html>")},
+		"assets/app.js": {Data: []byte("console.log('todo')")},
+	}
+	h := NewWebHTTPHandler(web_service.NewWebService(web_fs_repository.NewWebRepository(files)), files)
 
 	mux := http.NewServeMux()
 	for _, route := range h.Routes() {
@@ -31,6 +34,29 @@ func TestMainPageRoute(t *testing.T) {
 			t.Fatalf("Content-Type = %q", ct)
 		}
 	})
+
+	t.Run("assets are served", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/assets/app.js", nil))
+
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "todo") {
+			t.Fatalf("code = %d, body = %q", rec.Code, rec.Body.String())
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "javascript") {
+			t.Fatalf("Content-Type = %q", ct)
+		}
+	})
+
+	for _, path := range []string{"/assets/", "/assets/missing.js", "/assets/../index.html"} {
+		t.Run("no listing or escape: "+path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+
+			if rec.Code == http.StatusOK {
+				t.Fatalf("%s: code = 200, body = %q", path, rec.Body.String())
+			}
+		})
+	}
 
 	t.Run("unknown path is 404", func(t *testing.T) {
 		rec := httptest.NewRecorder()

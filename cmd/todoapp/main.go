@@ -94,7 +94,7 @@ func run() error {
 	logger.Debug("initializing feature", zap.String("feature", "web"))
 	webRepository := web_fs_repository.NewWebRepository(public.FS)
 	webService := web_service.NewWebService(webRepository)
-	webTransportHTTP := web_transport_http.NewWebHTTPHandler(webService)
+	webTransportHTTP := web_transport_http.NewWebHTTPHandler(webService, public.FS)
 
 	logger.Debug("initializing HTTP server")
 

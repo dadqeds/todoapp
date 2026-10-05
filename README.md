@@ -79,6 +79,6 @@ cmd/todoapp          точка входа, Dockerfile
 internal/core        домен, логгер, пул БД, HTTP-инфраструктура
 internal/features    users, tasks, statistics, web: transport → service → repository
 migrations           SQL-миграции (golang-migrate)
-public               фронтенд, встраивается в бинарник через go:embed
+public               фронтенд (index.html + assets/app.css, assets/app.js), встраивается через go:embed
 docs                 сгенерированная Swagger-спецификация
 ```

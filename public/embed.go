@@ -4,5 +4,5 @@ package public
 
 import "embed"
 
-//go:embed index.html
+//go:embed index.html assets
 var FS embed.FS
