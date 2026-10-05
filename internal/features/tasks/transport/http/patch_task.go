@@ -14,6 +14,7 @@ type PatchTaskRequest struct {
 	Title       core_http_types.Nullable[string] `json:"title"       swaggertype:"string"  example:"Купить молоко"`
 	Description core_http_types.Nullable[string] `json:"description" swaggertype:"string"  example:"2 литра"`
 	Completed   core_http_types.Nullable[bool]   `json:"completed"   swaggertype:"boolean" example:"true"`
+	Version     *int                             `json:"version"     example:"3"`
 }
 
 type PatchTaskResponse TaskDTOResponse
@@ -26,6 +27,7 @@ type PatchTaskResponse TaskDTOResponse
 // @Description 	2. **Явно передано значение**: '"description": "Утром в 06:30 выйти на прогулку с Бобиком"'
 // @Description 	3. **Явно передан null**: '"description": null' - очищает поле в БД (set to NULL)
 // @Description 	Ограничения: 'title' и 'completed' не могут быть выставлены как null
+// @Description 	Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
 // @Tags 			tasks
 // @Accept 			json
 // @Produce 		json
@@ -82,5 +84,6 @@ func taskPatchFromRequest(request PatchTaskRequest) domain.TaskPatch {
 		request.Title.ToDomain(),
 		request.Description.ToDomain(),
 		request.Completed.ToDomain(),
+		request.Version,
 	)
 }

@@ -173,3 +173,18 @@ func TestTaskApplyPatch(t *testing.T) {
 		})
 	}
 }
+
+func TestTaskApplyPatchExpectedVersion(t *testing.T) {
+	task := Task{Version: 3, Title: "a", CreatedAt: time.Now()}
+
+	if err := task.ApplyPatch(TaskPatch{Title: set("b"), ExpectedVersion: ptr(2)}); !errors.Is(err, core_errors.ErrConflict) {
+		t.Fatalf("stale version: err = %v, want ErrConflict", err)
+	}
+	if task.Title != "a" {
+		t.Fatalf("task changed on conflict: %+v", task)
+	}
+
+	if err := task.ApplyPatch(TaskPatch{Title: set("b"), ExpectedVersion: ptr(3)}); err != nil {
+		t.Fatalf("matching version: %v", err)
+	}
+}
