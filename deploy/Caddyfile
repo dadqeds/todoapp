@@ -1,0 +1,6 @@
+# Caddy сам получает и продлевает сертификат Let's Encrypt для APP_DOMAIN
+# (например, 1-2-3-4.sslip.io) — Telegram открывает мини-аппы только по HTTPS.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy todoapp:5050
+}

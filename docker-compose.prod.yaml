@@ -1,0 +1,25 @@
+# Дополнение для сервера: HTTPS через Caddy вместо туннеля.
+# Подключается через COMPOSE_FILE=docker-compose.yaml:docker-compose.prod.yaml в .env.
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    container_name: todoapp-caddy
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:?укажите APP_DOMAIN в .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ${PROJECT_ROOT:-.}/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Сертификаты: без тома Caddy запрашивал бы их заново при каждом
+      # пересоздании и упёрся бы в лимиты Let's Encrypt.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - todoapp
+    restart: always
+
+volumes:
+  caddy-data:
+  caddy-config:
