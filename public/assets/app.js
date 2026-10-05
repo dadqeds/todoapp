@@ -44,6 +44,7 @@ const ICONS = {
   chev: '<path d="M9 6l6 6-6 6"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+  repeat: '<path d="M4 11V9a3 3 0 013-3h12M16 3l3 3-3 3"/><path d="M20 13v2a3 3 0 01-3 3H5M8 21l-3-3 3-3"/>',
   share: '<path d="M12 4v11M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
   users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.8 3-6 6-6s5.2 2.2 6 6"/><path d="M15 5.5a3 3 0 010 5.9M17 14c2.2.6 3.5 2.2 4 5"/>',
@@ -89,6 +90,19 @@ function dueTag(task) {
   if (dayDiff(due, now) === 0) return `<span class="tag today">${esc(text)}</span>`;
   return `<span class="tag">${esc(text)}</span>`;
 }
+
+const WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+const isoWeekday = d => ((d.getDay() + 6) % 7) + 1;
+
+function repeatText(r) {
+  if (!r) return "";
+  if (r.kind === "daily" || (r.kind === "weekly" && r.weekdays?.length === 7)) return "каждый день";
+  if (r.kind === "weekly") return r.weekdays.map(d => WEEKDAYS[d - 1]).join(", ");
+  if (r.kind === "monthly") return "каждый месяц";
+  return "каждый год";
+}
+const sameRepeat = (a, b) =>
+  (!a && !b) || (a && b && a.kind === b.kind && (a.weekdays || []).join() === (b.weekdays || []).join());
 
 // Срок «на весь день» хранится как конец дня по времени пользователя.
 function buildDue(date, time) {
@@ -288,6 +302,8 @@ function taskCard(t) {
       <div class="task-title">${esc(t.title)}</div>
       ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
       <div class="task-meta">${dueTag(t)}${
+        t.repeat && !t.completed ? `<span class="tag">${icon("repeat", 12)} ${esc(repeatText(t.repeat))}</span>` : ""
+      }${
         isShared(list) && t.author_user_id !== state.me.id
           ? `<span class="tag">${esc(memberName(list, t.author_user_id) || "участник")}</span>`
           : ""
@@ -348,7 +364,7 @@ async function toggleTask(id) {
   try {
     await api(`/tasks/${id}`, send("PATCH", { completed: !t.completed, version: t.version }));
     if (!t.completed) haptic("success");
-    toast(t.completed ? "Задача снова в работе" : "Задача выполнена");
+    toast(t.completed ? "Задача снова в работе" : t.repeat ? "Готово. Следующая уже в списке" : "Задача выполнена");
     await refreshListsAndTasks();
   } catch (err) {
     handleError(err, refreshListsAndTasks);
@@ -483,6 +499,26 @@ function openTaskSheet(task = null) {
           <input class="field" type="time" id="taskTime" value="${due && !task.due_all_day ? toTimeInput(due) : ""}" aria-label="Время" />
         </div>
         <p class="hint">Без времени — срок до конца дня.</p>
+
+        <span class="field-label">Повтор</span>
+        <div class="chips wrap">${[
+          ["none", "Нет"],
+          ["daily", "Каждый день"],
+          ["weekly", "По дням недели"],
+          ["monthly", "Каждый месяц"],
+          ["yearly", "Каждый год"],
+        ]
+          .map(
+            ([v, label]) =>
+              `<button class="chip" type="button" data-repeat="" data-value="${v}" aria-pressed="${(task?.repeat?.kind || "none") === v}">${label}</button>`,
+          )
+          .join("")}</div>
+        <div class="chips wrap" id="weekdayPicker" style="margin-top:8px" ${task?.repeat?.kind === "weekly" ? "" : "hidden"} role="group" aria-label="Дни недели">${WEEKDAYS.map(
+          (d, i) =>
+            `<button class="chip weekday" type="button" data-weekday="${i + 1}" aria-pressed="${Boolean(
+              task?.repeat?.weekdays?.includes(i + 1),
+            )}">${d}</button>`,
+        ).join("")}</div>
       </div>
 
       <span class="field-label">Список</span>
@@ -513,6 +549,21 @@ function openTaskSheet(task = null) {
     $("#dueFields").hidden = value === "none";
     $("#taskDate").hidden = value !== "date";
   });
+  bindChoice("[data-repeat]", value => {
+    $("#weekdayPicker").hidden = value !== "weekly";
+    // По умолчанию — день недели выбранного срока.
+    if (value === "weekly" && !document.querySelector('[data-weekday][aria-pressed="true"]')) {
+      const due = readDue().due_at;
+      const day = isoWeekday(due ? new Date(due) : new Date());
+      document.querySelector(`[data-weekday="${day}"]`).setAttribute("aria-pressed", "true");
+    }
+  });
+  document.querySelectorAll("[data-weekday]").forEach(b => {
+    b.onclick = () => {
+      b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+      setDirty(true);
+    };
+  });
   bindChoice("[data-tlist]");
   if (task) {
     $("#taskToggle").onclick = async () => {
@@ -521,6 +572,14 @@ function openTaskSheet(task = null) {
     };
     $("#taskDelete").onclick = () => deleteTask(task);
   }
+}
+
+function readRepeat() {
+  const kind = chosen("[data-repeat]");
+  if (!kind || kind === "none" || chosen("[data-due]") === "none") return null;
+  if (kind !== "weekly") return { kind };
+  const weekdays = [...document.querySelectorAll('[data-weekday][aria-pressed="true"]')].map(b => Number(b.dataset.weekday));
+  return { kind, weekdays };
 }
 
 function readDue() {
@@ -549,6 +608,11 @@ async function saveTask(task) {
     return;
   }
   const due = readDue();
+  const repeat = readRepeat();
+  if (repeat?.kind === "weekly" && !repeat.weekdays.length) {
+    toast("Выберите хотя бы один день недели.", true);
+    return;
+  }
   const listId = Number(chosen("[data-tlist]"));
   try {
     if (task) {
@@ -563,12 +627,13 @@ async function saveTask(task) {
           ((!due.due_at && !task.due_at) || (due.due_at && task.due_at && +new Date(due.due_at) === +new Date(task.due_at)));
         if (!same) Object.assign(body, due);
       }
+      if (!sameRepeat(repeat, task.repeat)) body.repeat = repeat;
       if (!Object.keys(body).length) return closeSheet(true);
       body.version = task.version;
       await api(`/tasks/${task.id}`, send("PATCH", body));
       toast("Задача сохранена");
     } else {
-      await api("/tasks", send("POST", { title, description: description || undefined, list_id: listId, ...due }), {
+      await api("/tasks", send("POST", { title, description: description || undefined, list_id: listId, ...due, repeat }), {
         404: "Список не найден — возможно, его удалили.",
       });
       haptic("success");
@@ -1124,8 +1189,22 @@ async function start() {
     return;
   }
   $("#tabbar").hidden = false;
+  await syncTimezone();
   await joinFromLink();
   switchTab("tasks");
+}
+
+// Часовой пояс телефона нужен серверу для повторов и времени уведомлений.
+// Ошибка не мешает работе: попробуем при следующем открытии.
+async function syncTimezone() {
+  let tz = "";
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {}
+  if (!tz || tz === state.me.timezone) return;
+  try {
+    state.me = { ...state.me, ...(await api(`/users/${state.me.id}`, send("PATCH", { timezone: tz, version: state.me.version }))) };
+  } catch {}
 }
 
 // Ссылка t.me/<бот>?startapp=join_<код> открывает мини-апп с start_param.

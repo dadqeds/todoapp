@@ -9,6 +9,13 @@ definitions:
         example: short human-readable message
         type: string
     type: object
+  github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-internal_features_tasks_transport_http_RepeatDTO:
+    properties:
+      set:
+        type: boolean
+      value:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
+    type: object
   internal_features_lists_transport_http.CreateListRequest:
     properties:
       color:
@@ -238,6 +245,10 @@ definitions:
         example: 3
         minimum: 1
         type: integer
+      repeat:
+        allOf:
+        - $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
+        description: Повтор требует срока.
       title:
         example: Купить молоко
         maxLength: 100
@@ -266,6 +277,8 @@ definitions:
         type: integer
       list_id:
         type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
@@ -291,6 +304,8 @@ definitions:
         type: integer
       list_id:
         type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
@@ -314,6 +329,10 @@ definitions:
       list_id:
         example: 3
         type: integer
+      repeat:
+        allOf:
+        - $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-internal_features_tasks_transport_http_RepeatDTO'
+        description: null выключает повтор
       title:
         example: Купить молоко
         type: string
@@ -341,10 +360,30 @@ definitions:
         type: integer
       list_id:
         type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
         type: integer
+    type: object
+  internal_features_tasks_transport_http.RepeatDTO:
+    properties:
+      kind:
+        enum:
+        - daily
+        - weekly
+        - monthly
+        - yearly
+        example: weekly
+        type: string
+      weekdays:
+        example:
+        - 1
+        - 4
+        items:
+          type: integer
+        type: array
     type: object
   internal_features_tasks_transport_http.TaskDTOResponse:
     properties:
@@ -366,6 +405,8 @@ definitions:
         type: integer
       list_id:
         type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
@@ -400,6 +441,9 @@ definitions:
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
@@ -421,6 +465,9 @@ definitions:
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
@@ -439,6 +486,9 @@ definitions:
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
@@ -450,6 +500,9 @@ definitions:
         type: string
       phone_number:
         example: "+71112223344"
+        type: string
+      timezone:
+        example: Europe/Moscow
         type: string
       version:
         example: 3
@@ -469,6 +522,9 @@ definitions:
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
@@ -487,6 +543,9 @@ definitions:
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
@@ -1037,6 +1096,7 @@ paths:
         3. **Явно передан null**: '"description": null' - очищает поле в БД (set to NULL)
         Ограничения: 'title' и 'completed' не могут быть выставлены как null
         Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
+        Выполнение повторяющейся задачи создаёт следующую с новым сроком, у выполненной повтор снимается
       parameters:
       - description: ID изменяемой задачи
         in: path

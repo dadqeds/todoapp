@@ -28,8 +28,9 @@ func (r *TasksRepository) PatchTask(
 		list_id=$5,
 		due_at=$6,
 		due_all_day=$7,
+		repeat_rule=$8,
 		version=version + 1
-	WHERE id=$8 AND version=$9 
+	WHERE id=$9 AND version=$10 
 
 	RETURNING ` + taskColumns + `;
 	`
@@ -44,6 +45,7 @@ func (r *TasksRepository) PatchTask(
 		task.ListID,
 		task.DueAt,
 		task.DueAllDay,
+		repeatRuleToModel(task.Repeat),
 		id,
 		task.Version,
 	)

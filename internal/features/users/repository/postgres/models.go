@@ -2,7 +2,7 @@ package users_postgres_repository
 
 import "github.com/dadqeds/todoapp/internal/core/domain"
 
-const userColumns = `id, version, full_name, phone_number, telegram_id`
+const userColumns = `id, version, full_name, phone_number, telegram_id, timezone`
 
 type UserModel struct {
 	ID          int
@@ -10,6 +10,7 @@ type UserModel struct {
 	FullName    string
 	PhoneNumber *string
 	TelegramID  *int64
+	Timezone    string
 }
 
 // scanner покрывает и core_postgres_pool.Row, и core_postgres_pool.Rows.
@@ -26,19 +27,22 @@ func scanUserModel(s scanner) (UserModel, error) {
 		&userModel.FullName,
 		&userModel.PhoneNumber,
 		&userModel.TelegramID,
+		&userModel.Timezone,
 	)
 
 	return userModel, err
 }
 
 func userDomainFromModel(user UserModel) domain.User {
-	return domain.NewUser(
+	u := domain.NewUser(
 		user.ID,
 		user.Version,
 		user.FullName,
 		user.PhoneNumber,
 		user.TelegramID,
 	)
+	u.Timezone = user.Timezone
+	return u
 }
 
 func userDomainsFromModels(users []UserModel) []domain.User {

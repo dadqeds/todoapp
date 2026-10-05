@@ -28,6 +28,8 @@ func (s *TasksService) CreateTask(
 		return domain.Task{}, err
 	}
 
+	anchorRepeat(&task, actor.User.Location())
+
 	if err := task.Validate(); err != nil {
 		return domain.Task{}, fmt.Errorf(
 			"validate task domain: %w",

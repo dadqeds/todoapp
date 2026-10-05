@@ -302,6 +302,12 @@ textarea.field {
   background: var(--field);
 }
 
+.chip.weekday {
+  width: 38px;
+  justify-content: center;
+  padding: 7px 0;
+}
+
 .chip[aria-pressed="true"] {
   background: var(--ink);
   color: var(--on-ink);
@@ -393,6 +399,9 @@ textarea.field {
 }
 
 .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 12px;
   border-radius: 6px;
   padding: 2px 7px;

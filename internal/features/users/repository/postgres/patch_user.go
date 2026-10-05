@@ -23,8 +23,9 @@ func (r *UsersRepository) PatchUser(
 	SET
 		full_name=$1,
 		phone_number=$2,
+		timezone=$3,
 		version=version+1
-	WHERE id=$3 AND version=$4
+	WHERE id=$4 AND version=$5
 	RETURNING ` + userColumns + `;
 	`
 	row := r.pool.QueryRow(
@@ -32,6 +33,7 @@ func (r *UsersRepository) PatchUser(
 		query,
 		user.FullName,
 		user.PhoneNumber,
+		user.Timezone,
 		id,
 		user.Version,
 	)

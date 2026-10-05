@@ -8,6 +8,7 @@ type UserDTOResponse struct {
 	FullName    string  `json:"full_name"     example:"Ivan Ivanov"`
 	PhoneNumber *string `json:"phone_number"  example:"+79998887766"`
 	TelegramID  *int64  `json:"telegram_id"   example:"123456789"`
+	Timezone    string  `json:"timezone"      example:"Europe/Moscow"`
 }
 
 func userDTOFromDomain(user domain.User) UserDTOResponse {
@@ -17,6 +18,7 @@ func userDTOFromDomain(user domain.User) UserDTOResponse {
 		FullName:    user.FullName,
 		PhoneNumber: user.PhoneNumber,
 		TelegramID:  user.TelegramID,
+		Timezone:    user.Timezone,
 	}
 }
 

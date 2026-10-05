@@ -20,6 +20,8 @@ type CreateTaskRequest struct {
 	// Срок с часовым поясом. Для срока «на весь день» — конец дня по времени пользователя.
 	DueAt     *time.Time `json:"due_at"      example:"2026-10-05T18:00:00+03:00"`
 	DueAllDay bool       `json:"due_all_day" example:"false"`
+	// Повтор требует срока.
+	Repeat *RepeatDTO `json:"repeat"`
 }
 
 type CreateTaskResponse TaskDTOResponse
@@ -61,6 +63,8 @@ func (h *TasksHTTPHandler) CreateTask(rw http.ResponseWriter, r *http.Request) {
 		request.DueAt,
 		request.DueAllDay,
 	)
+
+	taskDomain.Repeat = request.Repeat.toDomain()
 
 	taskDomain, err := h.tasksService.CreateTask(ctx, taskDomain)
 	if err != nil {

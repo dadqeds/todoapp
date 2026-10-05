@@ -18,6 +18,32 @@ type TaskDTOResponse struct {
 	ListID       int        `json:"list_id"`
 	DueAt        *time.Time `json:"due_at"`
 	DueAllDay    bool       `json:"due_all_day"`
+	Repeat       *RepeatDTO `json:"repeat"`
+}
+
+// RepeatDTO — правило повтора. weekdays нужны только для weekly (1 = пн … 7 = вс);
+// день месяца и года берутся из срока задачи.
+type RepeatDTO struct {
+	Kind     string `json:"kind"               example:"weekly" enums:"daily,weekly,monthly,yearly"`
+	Weekdays []int  `json:"weekdays,omitempty" example:"1,4"`
+}
+
+func repeatDTOFromDomain(r *domain.Recurrence) *RepeatDTO {
+	if r == nil {
+		return nil
+	}
+	dto := &RepeatDTO{Kind: string(r.Kind)}
+	if r.Kind == domain.RepeatWeekly {
+		dto.Weekdays = r.Weekdays
+	}
+	return dto
+}
+
+func (d *RepeatDTO) toDomain() *domain.Recurrence {
+	if d == nil {
+		return nil
+	}
+	return &domain.Recurrence{Kind: domain.RepeatKind(d.Kind), Weekdays: d.Weekdays}
 }
 
 func taskDTOFromDomain(task domain.Task) TaskDTOResponse {
@@ -33,6 +59,7 @@ func taskDTOFromDomain(task domain.Task) TaskDTOResponse {
 		ListID:       task.ListID,
 		DueAt:        task.DueAt,
 		DueAllDay:    task.DueAllDay,
+		Repeat:       repeatDTOFromDomain(task.Repeat),
 	}
 }
 

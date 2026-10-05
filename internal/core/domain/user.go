@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	core_errors "github.com/dadqeds/todoapp/internal/core/errors"
 )
@@ -23,6 +24,22 @@ type User struct {
 	// TelegramID — id аккаунта Telegram, через который пользователь входит.
 	// nil у пользователей, созданных до входа через Telegram.
 	TelegramID *int64
+
+	// Timezone — пояс IANA (Europe/Moscow), по нему считаются повторы и время
+	// уведомлений. Пустой — UTC.
+	Timezone string
+}
+
+// Location возвращает часовой пояс пользователя, при ошибке — UTC.
+func (u *User) Location() *time.Location {
+	if u.Timezone == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(u.Timezone)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 func NewUser(
@@ -76,6 +93,16 @@ func (u *User) Validate() error {
 		)
 	}
 
+	if u.Timezone != "" {
+		if _, err := time.LoadLocation(u.Timezone); err != nil || len(u.Timezone) > 64 {
+			return fmt.Errorf(
+				"invalid `Timezone` %q: %w",
+				u.Timezone,
+				core_errors.ErrInvalidArgument,
+			)
+		}
+	}
+
 	if u.PhoneNumber != nil {
 		phoneNumberLen := len([]rune(*u.PhoneNumber))
 		if phoneNumberLen < 10 || phoneNumberLen > 15 {
@@ -98,24 +125,20 @@ func (u *User) Validate() error {
 type UserPatch struct {
 	Fullname    Nullable[string]
 	PhoneNumber Nullable[string]
+	Timezone    Nullable[string]
 
 	// ExpectedVersion — см. TaskPatch.ExpectedVersion.
 	ExpectedVersion *int
 }
 
-func NewUserPatch(
-	fullName Nullable[string],
-	phoneNumber Nullable[string],
-	expectedVersion *int,
-) UserPatch {
-	return UserPatch{
-		Fullname:        fullName,
-		PhoneNumber:     phoneNumber,
-		ExpectedVersion: expectedVersion,
-	}
-}
-
 func (p *UserPatch) Validate() error {
+	if p.Timezone.Set && p.Timezone.Value == nil {
+		return fmt.Errorf(
+			"`Timezone` can't be patched to NULL: %w",
+			core_errors.ErrInvalidArgument,
+		)
+	}
+
 	if p.Fullname.Set && p.Fullname.Value == nil {
 		return fmt.Errorf(
 			"`Fullname` can't be patched to NULL: %w",
@@ -143,6 +166,10 @@ func (u *User) ApplyPatch(patch UserPatch) error {
 
 	if patch.PhoneNumber.Set {
 		tmp.PhoneNumber = patch.PhoneNumber.Value
+	}
+
+	if patch.Timezone.Set {
+		tmp.Timezone = *patch.Timezone.Value
 	}
 
 	if err := tmp.Validate(); err != nil {

@@ -24,6 +24,9 @@ type Task struct {
 	// и показывать нужно только дату.
 	DueAt     *time.Time
 	DueAllDay bool
+
+	// Repeat — правило повтора; требует срока.
+	Repeat *Recurrence
 }
 
 func NewTask(
@@ -125,6 +128,18 @@ func (t *Task) Validate() error {
 		)
 	}
 
+	if t.Repeat != nil {
+		if t.DueAt == nil {
+			return fmt.Errorf(
+				"`Repeat` requires `DueAt`: %w",
+				core_errors.ErrInvalidArgument,
+			)
+		}
+		if err := t.Repeat.Validate(); err != nil {
+			return fmt.Errorf("validate repeat: %w", err)
+		}
+	}
+
 	if t.Completed {
 		if t.CompletedAt == nil {
 			return fmt.Errorf(
@@ -160,6 +175,9 @@ type TaskPatch struct {
 	// DueAt=null снимает срок (и DueAllDay вместе с ним).
 	DueAt     Nullable[time.Time]
 	DueAllDay Nullable[bool]
+
+	// Repeat=null выключает повтор. Снятие срока выключает повтор тоже.
+	Repeat Nullable[Recurrence]
 
 	// ExpectedVersion — версия, которую видел клиент. Если задана и не совпадает
 	// с текущей, патч отклоняется с ErrConflict (оптимистичная блокировка).
@@ -225,11 +243,16 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 		tmp.DueAt = patch.DueAt.Value
 		if tmp.DueAt == nil {
 			tmp.DueAllDay = false
+			tmp.Repeat = nil
 		}
 	}
 
 	if patch.DueAllDay.Set {
 		tmp.DueAllDay = *patch.DueAllDay.Value
+	}
+
+	if patch.Repeat.Set {
+		tmp.Repeat = patch.Repeat.Value
 	}
 
 	if patch.Completed.Set {
@@ -260,4 +283,19 @@ type TaskFilter struct {
 	ListID       *int
 	// AccessibleToUserID — задачи из списков, которыми пользователь владеет или в которых участвует.
 	AccessibleToUserID *int
+}
+
+// NextOccurrence возвращает следующий экземпляр повторяющейся задачи: та же
+// задача с новым сроком, ещё не выполненная. ok=false, если повтора нет.
+func (t *Task) NextOccurrence(now time.Time, loc *time.Location) (next Task, ok bool) {
+	if t.Repeat == nil || t.DueAt == nil {
+		return Task{}, false
+	}
+
+	due := t.Repeat.Next(*t.DueAt, now, loc)
+	repeat := *t.Repeat
+
+	next = NewTaskUninitialized(t.Title, t.Description, t.AuthorUserID, t.ListID, &due, t.DueAllDay)
+	next.Repeat = &repeat
+	return next, true
 }

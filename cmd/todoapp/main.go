@@ -8,6 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// База часовых поясов внутри бинарника: в alpine-образе её нет, а она
+	// нужна для повторов и уведомлений по местному времени пользователей.
+	_ "time/tzdata"
 
 	core_auth "github.com/dadqeds/todoapp/internal/core/auth"
 	core_logger "github.com/dadqeds/todoapp/internal/core/logger"

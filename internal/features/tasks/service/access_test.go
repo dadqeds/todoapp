@@ -12,14 +12,17 @@ import (
 )
 
 type fakeTasksRepository struct {
-	tasks     map[int]domain.Task
-	created   domain.Task
-	deleted   []int
-	gotFilter domain.TaskFilter
+	tasks        map[int]domain.Task
+	created      domain.Task
+	deleted      []int
+	gotFilter    domain.TaskFilter
+	createdCount int
+	patched      domain.Task
 }
 
 func (f *fakeTasksRepository) CreateTask(_ context.Context, task domain.Task) (domain.Task, error) {
 	f.created = task
+	f.createdCount++
 	return task, nil
 }
 
@@ -77,6 +80,7 @@ func (f *fakeTasksRepository) DeleteTask(_ context.Context, id int) error {
 }
 
 func (f *fakeTasksRepository) PatchTask(_ context.Context, _ int, task domain.Task) (domain.Task, error) {
+	f.patched = task
 	return task, nil
 }
 
@@ -256,5 +260,39 @@ func TestSharedListMember(t *testing.T) {
 func TestAuthorWhoLeftListLosesAccess(t *testing.T) {
 	if _, err := newService(newRepo()).GetTask(asActor(10, false), 3); !errors.Is(err, core_errors.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestCompletingRepeatingTaskCreatesNext(t *testing.T) {
+	repo := newRepo()
+	due := time.Now().Add(-time.Hour)
+	repo.tasks[1] = domain.Task{ID: 1, Version: 1, Title: "Планёрка", CreatedAt: due.Add(-time.Hour), AuthorUserID: 10, ListID: 100,
+		DueAt: &due, Repeat: &domain.Recurrence{Kind: domain.RepeatDaily}}
+	done := true
+
+	if _, err := newService(repo).PatchTask(asActor(10, false), 1, domain.TaskPatch{Completed: domain.Nullable[bool]{Value: &done, Set: true}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if repo.patched.Repeat != nil || !repo.patched.Completed {
+		t.Fatalf("completed instance must keep no repeat: %+v", repo.patched)
+	}
+	if repo.createdCount != 1 || repo.created.Completed || repo.created.Repeat == nil {
+		t.Fatalf("next occurrence not created correctly: count %d, %+v", repo.createdCount, repo.created)
+	}
+	if !repo.created.DueAt.After(time.Now()) {
+		t.Fatalf("next due %v must be in the future", repo.created.DueAt)
+	}
+}
+
+func TestCompletingPlainTaskCreatesNothing(t *testing.T) {
+	repo := newRepo()
+	done := true
+
+	if _, err := newService(repo).PatchTask(asActor(10, false), 1, domain.TaskPatch{Completed: domain.Nullable[bool]{Value: &done, Set: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.createdCount != 0 {
+		t.Fatalf("created %d tasks, want 0", repo.createdCount)
 	}
 }

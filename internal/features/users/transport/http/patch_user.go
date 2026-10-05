@@ -13,6 +13,7 @@ import (
 type PatchUserRequest struct {
 	FullName    core_http_types.Nullable[string] `json:"full_name"       swaggertype:"string" example:"Максим Максимович"`
 	PhoneNumber core_http_types.Nullable[string] `json:"phone_number"    swaggertype:"string" example:"+71112223344"`
+	Timezone    core_http_types.Nullable[string] `json:"timezone"        swaggertype:"string" example:"Europe/Moscow"`
 	Version     *int                             `json:"version"         example:"3"`
 }
 
@@ -75,9 +76,10 @@ func (h *UsersHTTPHandler) PatchUser(rw http.ResponseWriter, r *http.Request) {
 }
 
 func userPatchFromRequest(request PatchUserRequest) domain.UserPatch {
-	return domain.NewUserPatch(
-		request.FullName.ToDomain(),
-		request.PhoneNumber.ToDomain(),
-		request.Version,
-	)
+	return domain.UserPatch{
+		Fullname:        request.FullName.ToDomain(),
+		PhoneNumber:     request.PhoneNumber.ToDomain(),
+		Timezone:        request.Timezone.ToDomain(),
+		ExpectedVersion: request.Version,
+	}
 }
