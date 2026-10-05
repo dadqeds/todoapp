@@ -23,12 +23,14 @@ type PatchUserResponse UserDTOResponse
 // @Description		Изменение информации об уже существующем в системе пользователе.
 // @Description		Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
 // @Tags 			users
+// @Security 		TelegramInitData
 // @Accept 			json
 // @Produce 		json
 // @Param			id path int true "ID изменяемого пользователя"
 // @Param			request body PatchUserRequest true "PatchUser тело запроса"
 // @Success 		200 {object} PatchUserResponse "Успешно измененный пользователь"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
 // @Failure 		404 {object} core_http_response.ErrorResponse "Not found"
 // @Failure 		409 {object} core_http_response.ErrorResponse "Conflict"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"

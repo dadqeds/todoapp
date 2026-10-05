@@ -11,6 +11,10 @@ func (s *UsersService) GetUser(
 	ctx context.Context,
 	id int,
 ) (domain.User, error) {
+	if err := requireUserAccess(ctx, id); err != nil {
+		return domain.User{}, err
+	}
+
 	user, err := s.usersRepository.GetUser(ctx, id)
 	if err != nil {
 		return domain.User{}, fmt.Errorf("get user from repository: %w", err)

@@ -56,6 +56,11 @@ func (h *UsersHTTPHandler) Routes() []core_http_server.Route {
 		},
 		{
 			Method:  http.MethodGet,
+			Path:    "/me",
+			Handler: h.GetMe,
+		},
+		{
+			Method:  http.MethodGet,
 			Path:    "/users",
 			Handler: h.GetUsers,
 		},

@@ -15,11 +15,14 @@ type GetUsersResponse []UserDTOResponse
 // @Summary 		Список пользователей
 // @Description 	Просмотр списка пользователей с опциональной пагинацией
 // @Tags 			users
+// @Security 		TelegramInitData
 // @Produce 		json
 // @Param 			limit query int false "Размер страницы с пользователями (по умолчанию 50, максимум 500)"
 // @Param			offset query int false "Смещение страницы с пользователями"
 // @Success 		200 {object} GetUsersResponse "Успешное получение списка пользователей"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
+// @Failure 		403 {object} core_http_response.ErrorResponse "Только для администратора"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"
 // @Router 			/users [get]
 func (h *UsersHTTPHandler) GetUsers(rw http.ResponseWriter, r *http.Request) {

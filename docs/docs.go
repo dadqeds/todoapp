@@ -15,8 +15,44 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/me": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Пользователь, от имени которого выполняется запрос. Создаётся автоматически при первом входе через Telegram",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Текущий пользователь",
+                "responses": {
+                    "200": {
+                        "description": "Текущий пользователь",
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_users_transport_http.GetMeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/statistics": {
             "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Получение статистики по задачам с опциональной фильтрацией по user_id и/или временному промежутку",
                 "produces": [
                     "application/json"
@@ -58,6 +94,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
@@ -69,6 +111,11 @@ const docTemplate = `{
         },
         "/tasks": {
             "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Просмотр списка задач с опциональной фильтрацией по автору и пагинацией",
                 "produces": [
                     "application/json"
@@ -113,6 +160,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
@@ -122,6 +175,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Создать новую задачу в системе",
                 "consumes": [
                     "application/json"
@@ -157,6 +215,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Автор не найден",
                         "schema": {
@@ -174,6 +238,11 @@ const docTemplate = `{
         },
         "/tasks/{id}": {
             "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Получение конкретной задачи по ее ID",
                 "produces": [
                     "application/json"
@@ -204,6 +273,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not found",
                         "schema": {
@@ -219,6 +294,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Удаление существующей задачи по ее ID",
                 "tags": [
                     "tasks"
@@ -243,6 +323,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not found",
                         "schema": {
@@ -258,6 +344,11 @@ const docTemplate = `{
                 }
             },
             "patch": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Обновляет информацию об уже существующей в системе задаче\n### Логика обновления полей (Three-state logic):\n1. **Поле не передано**: 'description' игнорируется, значение в БД не меняется\n2. **Явно передано значение**: '\"description\": \"Утром в 06:30 выйти на прогулку с Бобиком\"'\n3. **Явно передан null**: '\"description\": null' - очищает поле в БД (set to NULL)\nОграничения: 'title' и 'completed' не могут быть выставлены как null\nНеобязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409",
                 "consumes": [
                     "application/json"
@@ -300,6 +391,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not found",
                         "schema": {
@@ -323,6 +420,11 @@ const docTemplate = `{
         },
         "/users": {
             "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Просмотр списка пользователей с опциональной пагинацией",
                 "produces": [
                     "application/json"
@@ -361,6 +463,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Только для администратора",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
@@ -370,6 +484,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Создать нового пользователя в системе",
                 "consumes": [
                     "application/json"
@@ -405,6 +524,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Только для администратора",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
@@ -416,6 +547,11 @@ const docTemplate = `{
         },
         "/users/{id}": {
             "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Получение конкретного пользователя по его ID",
                 "produces": [
                     "application/json"
@@ -446,6 +582,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not found",
                         "schema": {
@@ -461,6 +603,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Удаление существующего пользователя по его ID",
                 "tags": [
                     "users"
@@ -481,6 +628,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Только для администратора",
                         "schema": {
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
@@ -506,6 +665,11 @@ const docTemplate = `{
                 }
             },
             "patch": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
                 "description": "Изменение информации об уже существующем в системе пользователе.\nНеобязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409",
                 "consumes": [
                     "application/json"
@@ -544,6 +708,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
                         "schema": {
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
@@ -608,12 +778,13 @@ const docTemplate = `{
         "internal_features_tasks_transport_http.CreateTaskRequest": {
             "type": "object",
             "required": [
-                "author_user_id",
                 "title"
             ],
             "properties": {
                 "author_user_id": {
+                    "description": "Учитывается только для администратора, остальным автором ставится текущий пользователь.",
                     "type": "integer",
+                    "minimum": 1,
                     "example": 1
                 },
                 "description": {
@@ -776,7 +947,7 @@ const docTemplate = `{
                 "full_name": {
                     "type": "string",
                     "maxLength": 100,
-                    "minLength": 3,
+                    "minLength": 1,
                     "example": "Ivan Ivanov"
                 },
                 "phone_number": {
@@ -802,6 +973,39 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "telegram_id": {
+                    "type": "integer",
+                    "example": 123456789
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "internal_features_users_transport_http.GetMeResponse": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string",
+                    "example": "Ivan Ivanov"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "is_admin": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "phone_number": {
+                    "type": "string",
+                    "example": "+79998887766"
+                },
+                "telegram_id": {
+                    "type": "integer",
+                    "example": 123456789
+                },
                 "version": {
                     "type": "integer",
                     "example": 3
@@ -822,6 +1026,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+79998887766"
+                },
+                "telegram_id": {
+                    "type": "integer",
+                    "example": 123456789
                 },
                 "version": {
                     "type": "integer",
@@ -861,6 +1069,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "telegram_id": {
+                    "type": "integer",
+                    "example": 123456789
+                },
                 "version": {
                     "type": "integer",
                     "example": 3
@@ -882,11 +1094,23 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "telegram_id": {
+                    "type": "integer",
+                    "example": 123456789
+                },
                 "version": {
                     "type": "integer",
                     "example": 3
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "TelegramInitData": {
+            "description": "\"tma \u003cinitData\u003e\" из Telegram.WebApp.initData. На локальном адресе (AUTH_LOCAL_ADDR) не требуется",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

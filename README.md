@@ -1,10 +1,17 @@
 # todoapp
 
-REST API для задач и пользователей на Go + PostgreSQL со встроенным веб-интерфейсом.
+Список задач в виде Telegram Mini App: Go + PostgreSQL, веб-интерфейс встроен в бинарник.
 
-- UI: `http://localhost:5050/`
-- API: `http://localhost:5050/api/v1`
-- Swagger: `http://localhost:5050/swagger/index.html` (выключается `HTTP_SWAGGER_ENABLED=false`)
+Сервер слушает два адреса:
+
+| Адрес | Для чего | Вход |
+| --- | --- | --- |
+| `http://localhost:5050` (`HTTP_ADDR`) | Публичный: сюда смотрит туннель, мини-апп открывается из Telegram | Только с `initData` Telegram |
+| `http://localhost:5051` (`AUTH_LOCAL_ADDR`) | Локальный: открыть в браузере на своём компьютере | Без Telegram, от имени `AUTH_LOCAL_TELEGRAM_ID`, права администратора |
+
+Swagger всегда доступен на локальном адресе: `http://localhost:5051/swagger/index.html`.
+
+> Локальный порт нельзя пробрасывать наружу: любой, кто до него достучится, получит права администратора. В `docker-compose.yaml` оба порта привязаны к `127.0.0.1`.
 
 ## Быстрый старт
 
@@ -22,6 +29,28 @@ make todoapp-deploy         # приложение в Docker
 ```bash
 make env-up env-port-forward migrate-up
 make todoapp-run
+```
+
+## Telegram
+
+1. Создайте бота у [@BotFather](https://t.me/BotFather) и положите токен в `AUTH_TELEGRAM_BOT_TOKEN`.
+2. Узнайте свой Telegram id (например, у [@userinfobot](https://t.me/userinfobot)) и укажите его в `AUTH_LOCAL_TELEGRAM_ID` и `AUTH_ADMIN_TELEGRAM_IDS`.
+3. Telegram открывает мини-аппы только по HTTPS. Поднимите туннель на публичный адрес, например:
+   ```bash
+   cloudflared tunnel --url http://localhost:5050
+   ```
+4. В @BotFather: `/mybots` → бот → *Bot Settings* → *Menu Button* (или `/newapp`) и укажите HTTPS-адрес туннеля.
+
+Как это работает: Telegram передаёт мини-аппу строку `initData`, подписанную ключом бота. Фронт отправляет её в каждом запросе в заголовке `Authorization: tma <initData>`, сервер проверяет подпись и срок (`AUTH_INIT_DATA_MAX_AGE`). При первом входе пользователь создаётся автоматически.
+
+Права:
+- обычный пользователь видит и меняет только свои задачи и свою статистику; чужие задачи для него не существуют (404);
+- администратор (`AUTH_ADMIN_TELEGRAM_IDS` и локальный адрес) видит всё и управляет пользователями.
+
+Чтобы привязать уже существующего пользователя (и его задачи) к своему Telegram, до первого входа выполните:
+
+```sql
+UPDATE todoapp.users SET telegram_id = <ваш id> WHERE id = <id пользователя>;
 ```
 
 ## Make-цели
@@ -47,12 +76,17 @@ make todoapp-run
 | `HTTP_SHUTDOWN_TIMEOUT` | `30s` | Время на graceful shutdown |
 | `HTTP_READ_HEADER_TIMEOUT`, `HTTP_READ_TIMEOUT`, `HTTP_WRITE_TIMEOUT`, `HTTP_IDLE_TIMEOUT` | `5s`, `15s`, `30s`, `60s` | Таймауты `http.Server` |
 | `HTTP_CORS_ALLOWED_ORIGINS` | пусто | Origin-ы через запятую. UI отдаётся тем же сервером, поэтому CORS по умолчанию выключен |
-| `HTTP_SWAGGER_ENABLED` | `true` | Отдавать ли Swagger UI |
+| `HTTP_SWAGGER_ENABLED` | `false` | Swagger на публичном адресе (на локальном включён всегда) |
 | `POSTGRES_HOST`, `POSTGRES_PORT` | —, `5432` | Адрес БД |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | — | Учётные данные |
 | `POSTGRES_SSLMODE` | `disable` | `sslmode` подключения |
 | `POSTGRES_TIMEOUT` | — | Таймаут одной операции с БД |
 | `POSTGRES_MAX_CONNS`, `POSTGRES_MIN_CONNS`, `POSTGRES_MAX_CONN_LIFETIME`, `POSTGRES_MAX_CONN_IDLE_TIME` | дефолты pgxpool | Настройки пула |
+| `AUTH_TELEGRAM_BOT_TOKEN` | — | Токен бота. Без него публичный API отвечает 401 |
+| `AUTH_INIT_DATA_MAX_AGE` | `24h` | Срок жизни `initData` |
+| `AUTH_ADMIN_TELEGRAM_IDS` | пусто | Telegram id администраторов через запятую |
+| `AUTH_LOCAL_ADDR` | пусто (в compose `:5051`, в `make todoapp-run` `127.0.0.1:5051`) | Локальный адрес без Telegram |
+| `AUTH_LOCAL_TELEGRAM_ID` | — (обязателен, если задан `AUTH_LOCAL_ADDR`) | От чьего имени работает локальный адрес |
 | `LOGGER_LEVEL` | `DEBUG` | Уровень логирования |
 | `LOGGER_FOLDER` | — | Папка для файлов логов |
 
@@ -60,15 +94,19 @@ make todoapp-run
 
 | Метод | Путь | Описание |
 | --- | --- | --- |
-| `GET` | `/users?limit&offset` | Список пользователей |
-| `POST` | `/users` | Создать пользователя |
-| `GET` / `PATCH` / `DELETE` | `/users/{id}` | Получить / изменить / удалить. Удаление пользователя с задачами → `409` |
-| `GET` | `/tasks?user_id&limit&offset` | Список задач |
-| `POST` | `/tasks` | Создать задачу |
-| `GET` / `PATCH` / `DELETE` | `/tasks/{id}` | Получить / изменить / удалить |
-| `GET` | `/statistics?user_id&from&to` | Статистика (`from`/`to` в формате `YYYY-MM-DD`) |
+| `GET` | `/me` | Текущий пользователь и `is_admin` |
+| `GET` | `/users?limit&offset` | Список пользователей (админ) |
+| `POST` | `/users` | Создать пользователя (админ) |
+| `GET` / `PATCH` | `/users/{id}` | Получить / изменить себя (админ — любого) |
+| `DELETE` | `/users/{id}` | Удалить (админ). Пользователь с задачами → `409` |
+| `GET` | `/tasks?user_id&limit&offset` | Список задач (`user_id` учитывается только для админа) |
+| `POST` | `/tasks` | Создать задачу (`author_user_id` учитывается только для админа) |
+| `GET` / `PATCH` / `DELETE` | `/tasks/{id}` | Получить / изменить / удалить свою задачу |
+| `GET` | `/statistics?user_id&from&to` | Статистика (`from`/`to` в формате `YYYY-MM-DD`; `user_id` только для админа) |
 
 `limit` по умолчанию 50, максимум 500. `PATCH` поддерживает три состояния поля: не передано — не меняется, значение — обновляется, `null` — очищается (для nullable-полей). Изменения защищены оптимистичной блокировкой по `version`: при конкурентном изменении вернётся `409`.
+
+Все запросы к API на публичном адресе требуют заголовок `Authorization: tma <initData>`, без него — `401`.
 
 Ошибки возвращаются в формате `{"error": "...", "message": "..."}`. Для `5xx` детали ошибки не раскрываются клиенту и пишутся только в лог.
 

@@ -15,7 +15,8 @@ func TestUserValidate(t *testing.T) {
 	}{
 		{"valid without phone", User{FullName: "Ivan"}, false},
 		{"valid with phone", User{FullName: "Ivan", PhoneNumber: ptr("+79998887766")}, false},
-		{"short name", User{FullName: "Iv"}, true},
+		{"empty name", User{FullName: ""}, true},
+		{"one letter name", User{FullName: "Я"}, false},
 		{"phone without plus", User{FullName: "Ivan", PhoneNumber: ptr("79998887766")}, true},
 		{"phone with letters", User{FullName: "Ivan", PhoneNumber: ptr("+7999888abcd")}, true},
 		{"short phone", User{FullName: "Ivan", PhoneNumber: ptr("+7999")}, true},

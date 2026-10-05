@@ -65,6 +65,14 @@ func (h *HTTPResponseHandler) ErrorResponse(err error, msg string) {
 		statusCode = http.StatusConflict
 		logFunc = h.log.Warn
 
+	case errors.Is(err, core_errors.ErrUnauthenticated):
+		statusCode = http.StatusUnauthorized
+		logFunc = h.log.Debug
+
+	case errors.Is(err, core_errors.ErrForbidden):
+		statusCode = http.StatusForbidden
+		logFunc = h.log.Warn
+
 	default:
 		statusCode = http.StatusInternalServerError
 		logFunc = h.log.Error

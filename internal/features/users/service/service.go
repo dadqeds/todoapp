@@ -37,6 +37,16 @@ type UsersRepository interface {
 		id int,
 		user domain.User,
 	) (domain.User, error)
+
+	GetUserByTelegramID(
+		ctx context.Context,
+		telegramID int64,
+	) (domain.User, error)
+
+	CreateTelegramUser(
+		ctx context.Context,
+		user domain.User,
+	) (domain.User, error)
 }
 
 func NewUserService(

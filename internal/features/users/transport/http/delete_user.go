@@ -12,9 +12,12 @@ import (
 // @Summary 		Удаление пользователя
 // @Description 	Удаление существующего пользователя по его ID
 // @Tags 			users
+// @Security 		TelegramInitData
 // @Param			id path int true "ID удаляемого пользователя"
 // @Success 		204	"Успешное удаление пользователя"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
+// @Failure 		403 {object} core_http_response.ErrorResponse "Только для администратора"
 // @Failure 		404 {object} core_http_response.ErrorResponse "Not found"
 // @Failure 		409 {object} core_http_response.ErrorResponse "У пользователя есть задачи"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"

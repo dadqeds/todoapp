@@ -9,11 +9,20 @@ import (
 
 var phoneNumberRegexp = regexp.MustCompile(`^\+[0-9]+$`)
 
+const (
+	FullNameMinLen = 1
+	FullNameMaxLen = 100
+)
+
 type User struct {
 	ID          int
 	Version     int
 	FullName    string
 	PhoneNumber *string
+
+	// TelegramID — id аккаунта Telegram, через который пользователь входит.
+	// nil у пользователей, созданных до входа через Telegram.
+	TelegramID *int64
 }
 
 func NewUser(
@@ -21,12 +30,14 @@ func NewUser(
 	version int,
 	fullName string,
 	phoneNumber *string,
+	telegramID *int64,
 ) User {
 	return User{
 		ID:          id,
 		Version:     version,
 		FullName:    fullName,
 		PhoneNumber: phoneNumber,
+		TelegramID:  telegramID,
 	}
 }
 
@@ -39,13 +50,25 @@ func NewUserUninitialized(
 		UninitializedVersion,
 		fullName,
 		phoneNumber,
+		nil,
+	)
+}
+
+// NewTelegramUserUninitialized создаёт пользователя при первом входе через Telegram.
+func NewTelegramUserUninitialized(fullName string, telegramID int64) User {
+	return NewUser(
+		UninitializedID,
+		UninitializedVersion,
+		fullName,
+		nil,
+		&telegramID,
 	)
 }
 
 func (u *User) Validate() error {
 	fullnameLen := len([]rune(u.FullName))
 
-	if fullnameLen < 3 || fullnameLen > 100 {
+	if fullnameLen < FullNameMinLen || fullnameLen > FullNameMaxLen {
 		return fmt.Errorf(
 			"invalid `FullName` len: %d: %w",
 			fullnameLen,

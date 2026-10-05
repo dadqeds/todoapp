@@ -25,11 +25,7 @@ func (r *UsersRepository) PatchUser(
 		phone_number=$2,
 		version=version+1
 	WHERE id=$3 AND version=$4
-	RETURNING
-		id,
-		version,
-		full_name,
-		phone_number;
+	RETURNING ` + userColumns + `;
 	`
 	row := r.pool.QueryRow(
 		ctx,
@@ -40,13 +36,7 @@ func (r *UsersRepository) PatchUser(
 		user.Version,
 	)
 
-	var userModel UserModel
-	err := row.Scan(
-		&userModel.ID,
-		&userModel.Version,
-		&userModel.FullName,
-		&userModel.PhoneNumber,
-	)
+	userModel, err := scanUserModel(row)
 	if err != nil {
 		if errors.Is(err, core_postgres_pool.ErrNoRows) {
 			return domain.User{}, fmt.Errorf(
@@ -59,11 +49,6 @@ func (r *UsersRepository) PatchUser(
 		return domain.User{}, fmt.Errorf("scan error: %w", err)
 	}
 
-	userDomain := domain.NewUser(
-		userModel.ID,
-		userModel.Version,
-		userModel.FullName,
-		userModel.PhoneNumber,
-	)
+	userDomain := userDomainFromModel(userModel)
 	return userDomain, nil
 }

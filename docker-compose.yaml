@@ -8,7 +8,12 @@ services:
       - HTTP_ADDR=:5050
       - HTTP_SHUTDOWN_TIMEOUT=${HTTP_SHUTDOWN_TIMEOUT:-30s}
       - HTTP_CORS_ALLOWED_ORIGINS=${HTTP_CORS_ALLOWED_ORIGINS:-}
-      - HTTP_SWAGGER_ENABLED=${HTTP_SWAGGER_ENABLED:-true}
+      - HTTP_SWAGGER_ENABLED=${HTTP_SWAGGER_ENABLED:-false}
+      - AUTH_TELEGRAM_BOT_TOKEN=${AUTH_TELEGRAM_BOT_TOKEN:-}
+      - AUTH_INIT_DATA_MAX_AGE=${AUTH_INIT_DATA_MAX_AGE:-24h}
+      - AUTH_ADMIN_TELEGRAM_IDS=${AUTH_ADMIN_TELEGRAM_IDS:-}
+      - AUTH_LOCAL_ADDR=:5051
+      - AUTH_LOCAL_TELEGRAM_ID=${AUTH_LOCAL_TELEGRAM_ID}
       - POSTGRES_HOST=todoapp-postgres
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -20,7 +25,10 @@ services:
     volumes:
       - ${PROJECT_ROOT:-.}/out/logs:/app/out/logs
     ports:
-      - "5050:5050"
+      # Оба порта только на 127.0.0.1: 5050 — для туннеля к Telegram,
+      # 5051 — локальный вход без Telegram, наружу его не пробрасывать.
+      - "127.0.0.1:5050:5050"
+      - "127.0.0.1:5051:5051"
     depends_on:
       todoapp-postgres:
         condition: service_healthy
