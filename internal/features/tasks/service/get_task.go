@@ -14,7 +14,7 @@ func (s *TasksService) GetTask(
 	task, err := s.tasksRepository.GetTask(ctx, id)
 	if err != nil {
 		return domain.Task{}, fmt.Errorf(
-			"get task from repositroy: %w",
+			"get task from repository: %w",
 			err,
 		)
 	}

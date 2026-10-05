@@ -3,21 +3,26 @@ package statistics_service
 import (
 	"context"
 	"time"
-
-	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
 type StatisticsService struct {
 	statisticsRepository StatisticsRepository
 }
 
+// TasksSummary — агрегаты по задачам, посчитанные хранилищем.
+type TasksSummary struct {
+	Created               int
+	Completed             int
+	AverageCompletionTime *time.Duration
+}
+
 type StatisticsRepository interface {
-	GetTasks(
+	GetTasksSummary(
 		ctx context.Context,
 		userID *int,
 		from *time.Time,
 		to *time.Time,
-	) ([]domain.Task, error)
+	) (TasksSummary, error)
 }
 
 func NewStatisticsService(

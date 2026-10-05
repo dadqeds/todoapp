@@ -18,8 +18,8 @@ type UsersRepository interface {
 
 	GetUsers(
 		ctx context.Context,
-		limit *int,
-		offset *int,
+		limit int,
+		offset int,
 	) ([]domain.User, error)
 
 	GetUser(

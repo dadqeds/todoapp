@@ -4,21 +4,21 @@ import "time"
 
 type Statistics struct {
 	TasksCreated               int
-	TasksComplited             int
-	TasksComplitedRate         *float64
+	TasksCompleted             int
+	TasksCompletedRate         *float64
 	TasksAverageCompletionTime *time.Duration
 }
 
 func NewStatistics(
 	tasksCreated int,
-	tasksComplited int,
-	tasksComplitedRate *float64,
+	tasksCompleted int,
+	tasksCompletedRate *float64,
 	tasksAverageCompletionTime *time.Duration,
 ) Statistics {
 	return Statistics{
 		TasksCreated:               tasksCreated,
-		TasksComplited:             tasksComplited,
-		TasksComplitedRate:         tasksComplitedRate,
+		TasksCompleted:             tasksCompleted,
+		TasksCompletedRate:         tasksCompletedRate,
 		TasksAverageCompletionTime: tasksAverageCompletionTime,
 	}
 }

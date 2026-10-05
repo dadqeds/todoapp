@@ -1,7 +1,13 @@
-include .env
+-include .env
 export
 
-export PROJECT_ROOT= $(shell pwd)
+PROJECT_ROOT := $(shell pwd)
+export PROJECT_ROOT
+
+.PHONY: env-up env-down env-cleanup env-port-forward env-port-close \
+	migrate-create migrate-up migrate-down migrate-action \
+	logs-cleanup todoapp-run todoapp-deploy todoapp-undeploy \
+	swagger-gen test vet lint check ps
 
 env-up:
 	@docker compose up -d todoapp-postgres
@@ -12,13 +18,12 @@ env-down:
 env-cleanup:
 	@read -p "Очистить все volume файлы окружения? Опасность утери данных. [y/N]: " ans; \
 	if [ "$$ans" = "y" ]; then \
-		docker compose down todoapp-postgres  port-forwarder && \
+		docker compose down todoapp-postgres port-forwarder && \
 		rm -rf ${PROJECT_ROOT}/out/pgdata && \
-		echo "Файлы окружения очищенны"; \
+		echo "Файлы окружения очищены"; \
 	else \
 		echo "Очистка окружения отменена"; \
 	fi
-
 
 env-port-forward:
 	@docker compose up -d port-forwarder
@@ -28,7 +33,7 @@ env-port-close:
 
 migrate-create:
 	@if [ -z "$(seq)" ]; then \
-		echo "Отсутствует необходимый праметр seq. Пример make migrate-create seq=init"; \
+		echo "Отсутствует необходимый параметр seq. Пример: make migrate-create seq=init"; \
 		exit 1; \
 	fi; \
 	docker compose run --rm todoapp-postgres-migrate \
@@ -38,37 +43,34 @@ migrate-create:
 		-seq "$(seq)"
 
 migrate-up:
-	@make migrate-action action=up
+	@$(MAKE) --no-print-directory migrate-action action=up
 
 migrate-down:
-	@make migrate-action action=down
+	@$(MAKE) --no-print-directory migrate-action action=down
 
 migrate-action:
 	@if [ -z "$(action)" ]; then \
-		echo "Отсутствует необходимый праметр action. Пример make migrate-action action=up"; \
+		echo "Отсутствует необходимый параметр action. Пример: make migrate-action action=up"; \
 		exit 1; \
 	fi; \
 	docker compose run --rm todoapp-postgres-migrate \
 		-path /migrations \
-		-database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@todoapp-postgres:5432/${POSTGRES_DB}?sslmode=disable \
+		-database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@todoapp-postgres:5432/$${POSTGRES_DB}?sslmode=disable" \
 		"$(action)"
-
 
 logs-cleanup:
 	@read -p "Очистить все log файлы? Опасность утери логов. [y/N]: " ans; \
 	if [ "$$ans" = "y" ]; then \
 		rm -rf ${PROJECT_ROOT}/out/logs && \
-		echo "Файлы логов очищенны"; \
+		echo "Файлы логов очищены"; \
 	else \
 		echo "Очистка логов отменена"; \
 	fi
 
 todoapp-run:
-	@export LOGGER_FOLDER=${PROJECT_ROOT}/out/logs && \
-	export POSTGRES_HOST=localhost && \
-	go mod tidy && \
-	go run ${PROJECT_ROOT}/cmd/todoapp/main.go
-
+	@LOGGER_FOLDER=${PROJECT_ROOT}/out/logs \
+	POSTGRES_HOST=localhost \
+	go run ${PROJECT_ROOT}/cmd/todoapp
 
 todoapp-deploy:
 	@docker compose up -d --build todoapp
@@ -83,6 +85,17 @@ swagger-gen:
 		-o docs \
 		--parseInternal \
 		--parseDependency
+
+test:
+	@go test -race ./...
+
+vet:
+	@go vet ./...
+
+lint:
+	@golangci-lint run ./...
+
+check: vet test
 
 ps:
 	@docker compose ps

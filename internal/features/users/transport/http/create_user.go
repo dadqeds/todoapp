@@ -50,6 +50,7 @@ func (h *UsersHTTPHandler) CreateUser(rw http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to create user",
 		)
+		return
 	}
 
 	response := CreateUserResponse(userDTOFromDomain(userDomain))

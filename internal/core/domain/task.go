@@ -59,7 +59,7 @@ func NewTaskUninitialized(
 	)
 }
 
-func (t *Task) ComplitedDuration() *time.Duration {
+func (t *Task) CompletionDuration() *time.Duration {
 	if !t.Completed {
 		return nil
 	}
@@ -68,16 +68,16 @@ func (t *Task) ComplitedDuration() *time.Duration {
 		return nil
 	}
 
-	duration := t.CompletedAt.Sub(*t.CompletedAt)
+	duration := t.CompletedAt.Sub(t.CreatedAt)
 	return &duration
 }
 
 func (t *Task) Validate() error {
-	titelLen := len([]rune(t.Title))
-	if titelLen < 1 || titelLen > 100 {
+	titleLen := len([]rune(t.Title))
+	if titleLen < 1 || titleLen > 100 {
 		return fmt.Errorf(
-			"invalid 'Titel' len: %d: %w",
-			titelLen,
+			"invalid 'Title' len: %d: %w",
+			titleLen,
 			core_errors.ErrInvalidArgument,
 		)
 	}
@@ -171,11 +171,14 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 	}
 
 	if patch.Completed.Set {
+		wasCompleted := tmp.Completed
 		tmp.Completed = *patch.Completed.Value
-		if tmp.Completed {
+
+		switch {
+		case tmp.Completed && !wasCompleted:
 			completedAt := time.Now()
 			tmp.CompletedAt = &completedAt
-		} else {
+		case !tmp.Completed:
 			tmp.CompletedAt = nil
 		}
 	}

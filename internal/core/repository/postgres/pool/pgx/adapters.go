@@ -13,12 +13,27 @@ type pgxRows struct {
 	pgx.Rows
 }
 
+func (r pgxRows) Scan(dest ...any) error {
+	if err := r.Rows.Scan(dest...); err != nil {
+		return mapErrors(err)
+	}
+
+	return nil
+}
+
+func (r pgxRows) Err() error {
+	if err := r.Rows.Err(); err != nil {
+		return mapErrors(err)
+	}
+
+	return nil
+}
+
 type pgxRow struct {
 	pgx.Row
 }
 
 func (r pgxRow) Scan(dest ...any) error {
-
 	err := r.Row.Scan(dest...)
 	if err != nil {
 		return mapErrors(err)

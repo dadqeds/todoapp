@@ -28,15 +28,7 @@ func (r *TasksRepository) PatchTask(
 		version=version + 1
 	WHERE id=$5 AND version=$6 
 
-	RETURNING
-		id,
-		version,
-		title,
-		description,
-		completed,
-		created_at,
-		completed_at,
-		author_user_id;
+	RETURNING ` + taskColumns + `;
 	`
 
 	row := r.pool.QueryRow(
@@ -50,18 +42,7 @@ func (r *TasksRepository) PatchTask(
 		task.Version,
 	)
 
-	var taskModel TaskModel
-
-	err := row.Scan(
-		&taskModel.ID,
-		&taskModel.Version,
-		&taskModel.Title,
-		&taskModel.Description,
-		&taskModel.Completed,
-		&taskModel.CreatedAt,
-		&taskModel.CompletedAt,
-		&taskModel.AuthorUserID,
-	)
+	taskModel, err := scanTaskModel(row)
 	if err != nil {
 		if errors.Is(err, core_postgres_pool.ErrNoRows) {
 			return domain.Task{}, fmt.Errorf(

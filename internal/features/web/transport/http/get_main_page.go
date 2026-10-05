@@ -22,5 +22,4 @@ func (h *WebHTTPHandler) GetMainPage(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	responseHandler.HTMLResponse(html)
-
 }

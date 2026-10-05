@@ -37,6 +37,7 @@ func (h *TasksHTTPHandler) DeleteTask(rw http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to delete task",
 		)
+		return
 	}
 
 	responseHandler.NoContentResponse()

@@ -13,10 +13,10 @@ type GetUsersResponse []UserDTOResponse
 
 // GetUsers 		godoc
 // @Summary 		Список пользователей
-// @Description 	Просмотр списка пользователей с опцианальной пагинацией
+// @Description 	Просмотр списка пользователей с опциональной пагинацией
 // @Tags 			users
 // @Produce 		json
-// @Param 			limit query int false "Размер страницы с пользователями"
+// @Param 			limit query int false "Размер страницы с пользователями (по умолчанию 50, максимум 500)"
 // @Param			offset query int false "Смещение страницы с пользователями"
 // @Success 		200 {object} GetUsersResponse "Успешное получение списка пользователей"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"

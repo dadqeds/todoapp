@@ -10,14 +10,14 @@ import (
 func (r *TasksRepository) GetTasks(
 	ctx context.Context,
 	userID *int,
-	limit *int,
-	offset *int,
+	limit int,
+	offset int,
 ) ([]domain.Task, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
 	query := `
-	SELECT id, version, title, description, completed, created_at, completed_at, author_user_id
+	SELECT ` + taskColumns + `
 	FROM todoapp.tasks
 	%s
 	ORDER BY id ASC
@@ -29,7 +29,7 @@ func (r *TasksRepository) GetTasks(
 
 	if userID != nil {
 		query = fmt.Sprintf(query, "WHERE author_user_id=$3")
-		args = append(args, userID)
+		args = append(args, *userID)
 	} else {
 		query = fmt.Sprintf(query, "")
 	}
@@ -48,20 +48,9 @@ func (r *TasksRepository) GetTasks(
 	var taskModels []TaskModel
 
 	for rows.Next() {
-		var taskModel TaskModel
-
-		err := rows.Scan(
-			&taskModel.ID,
-			&taskModel.Version,
-			&taskModel.Title,
-			&taskModel.Description,
-			&taskModel.Completed,
-			&taskModel.CreatedAt,
-			&taskModel.CompletedAt,
-			&taskModel.AuthorUserID,
-		)
+		taskModel, err := scanTaskModel(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan tasks:%w", err)
+			return nil, fmt.Errorf("scan tasks: %w", err)
 		}
 
 		taskModels = append(taskModels, taskModel)
@@ -70,7 +59,5 @@ func (r *TasksRepository) GetTasks(
 		return nil, fmt.Errorf("next rows: %w", err)
 	}
 
-	taskDomains := taskDomainsFromModles(taskModels)
-
-	return taskDomains, nil
+	return taskDomainsFromModels(taskModels), nil
 }
