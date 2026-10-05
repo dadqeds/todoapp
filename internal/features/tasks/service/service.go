@@ -46,6 +46,13 @@ type TasksRepository interface {
 		id int,
 		task domain.Task,
 	) (domain.Task, error)
+
+	GetTaskItems(ctx context.Context, taskID int) ([]domain.TaskItem, error)
+	GetTaskItem(ctx context.Context, taskID int, itemID int) (domain.TaskItem, error)
+	CreateTaskItem(ctx context.Context, item domain.TaskItem) (domain.TaskItem, error)
+	PatchTaskItem(ctx context.Context, item domain.TaskItem) (domain.TaskItem, error)
+	DeleteTaskItem(ctx context.Context, taskID int, itemID int) error
+	CopyTaskItems(ctx context.Context, fromTaskID int, toTaskID int) error
 }
 
 func NewTasksService(

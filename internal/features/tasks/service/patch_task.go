@@ -59,8 +59,15 @@ func (s *TasksService) PatchTask(
 	// Без транзакции: если создать следующую не удалось, выполнение уже
 	// сохранено, а ошибка вернётся клиенту.
 	if next != nil {
-		if _, err := s.tasksRepository.CreateTask(ctx, *next); err != nil {
+		created, err := s.tasksRepository.CreateTask(ctx, *next)
+		if err != nil {
 			return domain.Task{}, fmt.Errorf("create next occurrence: %w", err)
+		}
+		// Чеклист переходит в следующий повтор без отметок.
+		if task.ItemsTotal > 0 {
+			if err := s.tasksRepository.CopyTaskItems(ctx, id, created.ID); err != nil {
+				return domain.Task{}, fmt.Errorf("copy checklist to next occurrence: %w", err)
+			}
 		}
 	}
 

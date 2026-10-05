@@ -18,6 +18,9 @@ type fakeTasksRepository struct {
 	gotFilter    domain.TaskFilter
 	createdCount int
 	patched      domain.Task
+
+	items  map[int]domain.TaskItem
+	copied [][2]int
 }
 
 func (f *fakeTasksRepository) CreateTask(_ context.Context, task domain.Task) (domain.Task, error) {

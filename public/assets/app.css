@@ -419,6 +419,79 @@ textarea.field {
   color: var(--tag-today);
 }
 
+/* ---------- Чеклист ---------- */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.progress-track {
+  flex: 1;
+  max-width: 120px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--list-color, var(--ink));
+}
+
+.progress-count {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+}
+
+.check-item .task-check {
+  margin-top: 0;
+}
+
+.check-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.check-item.done .check-title {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.check-item .icon-btn {
+  color: var(--faint);
+}
+
+.check-add {
+  margin-top: 6px;
+}
+
+.check-add .btn {
+  flex: none;
+}
+
+.check-hide {
+  margin-top: 6px;
+}
+
 .task > .dot {
   margin-top: 7px;
 }

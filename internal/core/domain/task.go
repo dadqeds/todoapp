@@ -33,6 +33,10 @@ type Task struct {
 	// RemindedAt — когда напоминание отправлено; сбрасывается при смене срока.
 	RemindBeforeMinutes *int
 	RemindedAt          *time.Time
+
+	// Счётчики пунктов чеклиста: всего и отмеченных. Только для чтения.
+	ItemsTotal int
+	ItemsDone  int
 }
 
 // RemindOptions — допустимые значения напоминания: в срок, за 15 минут, за час, за день.
