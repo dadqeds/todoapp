@@ -20,7 +20,7 @@ func (r *TasksRepository) CreateTask(
 	query := `
 	INSERT INTO todoapp.tasks (title, description, completed, created_at, completed_at, author_user_id)
 	VALUES ($1, $2, $3, $4, $5, $6)
-	RETURNING id, version, title, description, completed, created_at, completed_at, author_user_id;
+	RETURNING ` + taskColumns + `;
 	`
 
 	row := r.pool.QueryRow(
@@ -34,45 +34,24 @@ func (r *TasksRepository) CreateTask(
 		task.AuthorUserID,
 	)
 
-	var taskModel TaskModel
-
-	err := row.Scan(
-		&taskModel.ID,
-		&taskModel.Version,
-		&taskModel.Title,
-		&taskModel.Description,
-		&taskModel.Completed,
-		&taskModel.CreatedAt,
-		&taskModel.CompletedAt,
-		&taskModel.AuthorUserID,
-	)
+	taskModel, err := scanTaskModel(row)
 
 	if err != nil {
 		if errors.Is(err, core_postgres_pool.ErrViolatesForeignKey) {
 			return domain.Task{}, fmt.Errorf(
-				"%v: user with id='%d': %w",
-				err,
+				"user with id='%d': %w",
 				task.AuthorUserID,
 				core_errors.ErrNotFound,
 			)
 		}
 
 		return domain.Task{}, fmt.Errorf(
-			"scan error:%w",
+			"scan error: %w",
 			err,
 		)
 	}
 
-	taskDomain := domain.NewTask(
-		taskModel.ID,
-		taskModel.Version,
-		taskModel.Title,
-		taskModel.Description,
-		taskModel.Completed,
-		taskModel.CreatedAt,
-		taskModel.CompletedAt,
-		taskModel.AuthorUserID,
-	)
+	taskDomain := taskDomainFromModel(taskModel)
 
 	return taskDomain, nil
 }

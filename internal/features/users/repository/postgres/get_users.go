@@ -9,10 +9,9 @@ import (
 
 func (r *UsersRepository) GetUsers(
 	ctx context.Context,
-	limit *int,
-	offset *int,
+	limit int,
+	offset int,
 ) ([]domain.User, error) {
-
 	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
@@ -53,7 +52,7 @@ func (r *UsersRepository) GetUsers(
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("next roes: %w", err)
+		return nil, fmt.Errorf("next rows: %w", err)
 	}
 	userdomains := userDomainsFromModels(userModels)
 

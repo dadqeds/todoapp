@@ -3,7 +3,7 @@ package core_http_response
 import "net/http"
 
 var (
-	StatusCodeUnitialized = -1
+	StatusCodeUninitialized = -1
 )
 
 type ResponseWriter struct {
@@ -14,17 +14,28 @@ type ResponseWriter struct {
 func NewResponseWriter(w http.ResponseWriter) *ResponseWriter {
 	return &ResponseWriter{
 		ResponseWriter: w,
-		statusCode:     StatusCodeUnitialized,
+		statusCode:     StatusCodeUninitialized,
 	}
 }
 
 func (rw *ResponseWriter) WriteHeader(statusCode int) {
+	// net/http учитывает только первый вызов WriteHeader, поэтому и мы
+	// запоминаем только первый код.
+	if rw.statusCode == StatusCodeUninitialized {
+		rw.statusCode = statusCode
+	}
 	rw.ResponseWriter.WriteHeader(statusCode)
-	rw.statusCode = statusCode
 }
 
-func (rw *ResponseWriter) GetStatuCode() int {
-	if rw.statusCode == StatusCodeUnitialized {
+func (rw *ResponseWriter) Write(b []byte) (int, error) {
+	if rw.statusCode == StatusCodeUninitialized {
+		rw.statusCode = http.StatusOK
+	}
+	return rw.ResponseWriter.Write(b)
+}
+
+func (rw *ResponseWriter) GetStatusCode() int {
+	if rw.statusCode == StatusCodeUninitialized {
 		return http.StatusOK
 	}
 

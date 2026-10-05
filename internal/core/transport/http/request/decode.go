@@ -9,6 +9,8 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+const maxRequestBodyBytes = 1 << 20 // 1 MiB
+
 var requestValidator = validator.New()
 
 type validatable interface {
@@ -16,7 +18,9 @@ type validatable interface {
 }
 
 func DecodeAndValidateRequest(r *http.Request, dest any) error {
-	if err := json.NewDecoder(r.Body).Decode(dest); err != nil {
+	body := http.MaxBytesReader(nil, r.Body, maxRequestBodyBytes)
+
+	if err := json.NewDecoder(body).Decode(dest); err != nil {
 		return fmt.Errorf(
 			"decode json: %v: %w",
 			err,

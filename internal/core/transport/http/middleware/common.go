@@ -2,6 +2,7 @@ package core_http_middleware
 
 import (
 	"net/http"
+	"regexp"
 	"time"
 
 	core_logger "github.com/dadqeds/todoapp/internal/core/logger"
@@ -14,24 +15,32 @@ const (
 	RequestIDHeader = "X-Request-ID"
 )
 
-func CORS() Middleware {
+// CORS разрешает кросс-доменные запросы только с перечисленных origin.
+// Фронтенд отдаётся тем же сервером, поэтому по умолчанию список пуст
+// и CORS-заголовки не выставляются вовсе.
+func CORS(allowedOrigins []string) Middleware {
+	allowed := make(map[string]struct{}, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		allowed[origin] = struct{}{}
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			allowedOrigins := map[string]struct{}{
-				"http://localhost:5050": {},
-				"null":                  {},
-			}
+			w.Header().Add("Vary", "Origin")
 
 			origin := r.Header.Get("Origin")
-
-			if _, ok := allowedOrigins[origin]; ok {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			_, ok := allowed[origin]
+			if origin == "" || !ok {
+				next.ServeHTTP(w, r)
+				return
 			}
 
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusOK)
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, "+RequestIDHeader)
+
+			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 
@@ -40,12 +49,14 @@ func CORS() Middleware {
 	}
 }
 
+var requestIDRegexp = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
 func RequestID() Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestID := r.Header.Get(RequestIDHeader)
-			if requestID == "" {
+			if !requestIDRegexp.MatchString(requestID) {
 				requestID = uuid.NewString()
 			}
 
@@ -83,7 +94,7 @@ func Trace() Middleware {
 
 			before := time.Now()
 			log.Debug(
-				">>> incomming HTTP request",
+				">>> incoming HTTP request",
 				zap.String("http_method", r.Method),
 				zap.Time("time", before.UTC()),
 			)
@@ -92,7 +103,7 @@ func Trace() Middleware {
 
 			log.Debug(
 				"<<< done HTTP request",
-				zap.Int("status_code", rw.GetStatuCode()),
+				zap.Int("status_code", rw.GetStatusCode()),
 				zap.Duration("latency", time.Since(before)),
 			)
 		})
@@ -110,7 +121,7 @@ func Panic() Middleware {
 				if p := recover(); p != nil {
 					responseHandler.PanicResponse(
 						p,
-						"during handel HTTP request got unexpected panic",
+						"during handle HTTP request got unexpected panic",
 					)
 				}
 			}()

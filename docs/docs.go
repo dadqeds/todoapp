@@ -40,7 +40,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Конец промежутся рассмотрения статистика (не включительно), формат: YYYY-MM-DD",
+                        "description": "Конец промежутка рассмотрения статистики (не включительно), формат: YYYY-MM-DD",
                         "name": "to",
                         "in": "query"
                     }
@@ -69,7 +69,7 @@ const docTemplate = `{
         },
         "/tasks": {
             "get": {
-                "description": "Просмотр списка задач с опцианальной пагинацией",
+                "description": "Просмотр списка задач с опциональной фильтрацией по автору и пагинацией",
                 "produces": [
                     "application/json"
                 ],
@@ -80,7 +80,13 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Размер страницы с задачами",
+                        "description": "Фильтрация задач по ID автора",
+                        "name": "user_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Размер страницы с задачами (по умолчанию 50, максимум 500)",
                         "name": "limit",
                         "in": "query"
                     },
@@ -116,7 +122,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Создать новоую задачу в системе",
+                "description": "Создать новую задачу в системе",
                 "consumes": [
                     "application/json"
                 ],
@@ -134,7 +140,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_features_tasks_transport_http.CreateTaskRespons"
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.CreateTaskRequest"
                         }
                     }
                 ],
@@ -142,11 +148,17 @@ const docTemplate = `{
                     "201": {
                         "description": "Успешно созданная задача",
                         "schema": {
-                            "$ref": "#/definitions/internal_features_tasks_transport_http.CreateTaskRespons"
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.CreateTaskResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Автор не найден",
                         "schema": {
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
@@ -246,7 +258,7 @@ const docTemplate = `{
                 }
             },
             "patch": {
-                "description": "Обновляет информацию об уже существующей в системе задаче\n### Логика обновления полей (Three-state logic):\n1. **Поле не передано**: 'description' игнорируется, значение в БД не меняется\n2. **Явно передано значение**: '\"description\": \"Утром в 06:30 выйти на прогулку с Бобиком\" •\n3. **Явно передан null**: '\"description\": null'- очищает поле в БД (set to NULL)\nОграничения: 'title\" и 'completed' не могут быть выставлены как null",
+                "description": "Обновляет информацию об уже существующей в системе задаче\n### Логика обновления полей (Three-state logic):\n1. **Поле не передано**: 'description' игнорируется, значение в БД не меняется\n2. **Явно передано значение**: '\"description\": \"Утром в 06:30 выйти на прогулку с Бобиком\"'\n3. **Явно передан null**: '\"description\": null' - очищает поле в БД (set to NULL)\nОграничения: 'title' и 'completed' не могут быть выставлены как null",
                 "consumes": [
                     "application/json"
                 ],
@@ -277,9 +289,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Успешно изманённая задача",
+                        "description": "Успешно изменённая задача",
                         "schema": {
-                            "$ref": "#/definitions/internal_features_tasks_transport_http.PatchUserResponse"
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.PatchTaskResponse"
                         }
                     },
                     "400": {
@@ -311,7 +323,7 @@ const docTemplate = `{
         },
         "/users": {
             "get": {
-                "description": "Просмотр списка пользователей с опцианальной пагинацией",
+                "description": "Просмотр списка пользователей с опциональной пагинацией",
                 "produces": [
                     "application/json"
                 ],
@@ -322,7 +334,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Размер страницы с пользователями",
+                        "description": "Размер страницы с пользователями (по умолчанию 50, максимум 500)",
                         "name": "limit",
                         "in": "query"
                     },
@@ -479,6 +491,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
                     },
+                    "409": {
+                        "description": "У пользователя есть задачи",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
@@ -566,28 +584,6 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-bool": {
-            "type": "object",
-            "properties": {
-                "set": {
-                    "type": "boolean"
-                },
-                "value": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-string": {
-            "type": "object",
-            "properties": {
-                "set": {
-                    "type": "boolean"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "internal_features_statistics_transport_http.GetStatisticsResponse": {
             "type": "object",
             "properties": {
@@ -595,11 +591,11 @@ const docTemplate = `{
                     "type": "string",
                     "example": "1m30s"
                 },
-                "tasks_complited": {
+                "tasks_completed": {
                     "type": "integer",
                     "example": 10
                 },
-                "tasks_complited_rate": {
+                "tasks_completed_rate": {
                     "type": "number",
                     "example": 20
                 },
@@ -609,7 +605,32 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_features_tasks_transport_http.CreateTaskRespons": {
+        "internal_features_tasks_transport_http.CreateTaskRequest": {
+            "type": "object",
+            "required": [
+                "author_user_id",
+                "title"
+            ],
+            "properties": {
+                "author_user_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "minLength": 1,
+                    "example": "2 литра, 3.2%"
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "example": "Купить молоко"
+                }
+            }
+        },
+        "internal_features_tasks_transport_http.CreateTaskResponse": {
             "type": "object",
             "properties": {
                 "author_user_id": {
@@ -671,17 +692,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "completed": {
-                    "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-bool"
+                    "type": "boolean",
+                    "example": true
                 },
                 "description": {
-                    "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-string"
+                    "type": "string",
+                    "example": "2 литра"
                 },
                 "title": {
-                    "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-string"
+                    "type": "string",
+                    "example": "Купить молоко"
                 }
             }
         },
-        "internal_features_tasks_transport_http.PatchUserResponse": {
+        "internal_features_tasks_transport_http.PatchTaskResponse": {
             "type": "object",
             "properties": {
                 "author_user_id": {
@@ -862,7 +886,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "127.0.0.1:5050",
+	Host:             "",
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Golang Todo API",

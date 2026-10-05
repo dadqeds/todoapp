@@ -1,7 +1,13 @@
 package web_fs_repository
 
-type WebRepository struct{}
+import "io/fs"
 
-func NewWebRepository() *WebRepository {
-	return &WebRepository{}
+type WebRepository struct {
+	files fs.FS
+}
+
+func NewWebRepository(files fs.FS) *WebRepository {
+	return &WebRepository{
+		files: files,
+	}
 }

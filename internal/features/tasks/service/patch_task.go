@@ -18,7 +18,7 @@ func (s *TasksService) PatchTask(
 	}
 
 	if err := task.ApplyPatch(patch); err != nil {
-		return domain.Task{}, fmt.Errorf("applay task patch: %w", err)
+		return domain.Task{}, fmt.Errorf("apply task patch: %w", err)
 	}
 
 	patchedTask, err := s.tasksRepository.PatchTask(ctx, id, task)

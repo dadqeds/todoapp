@@ -1,6 +1,8 @@
 package web_transport_http
 
 import (
+	"net/http"
+
 	core_http_server "github.com/dadqeds/todoapp/internal/core/transport/http/server"
 )
 
@@ -23,7 +25,8 @@ func NewWebHTTPHandler(
 func (h *WebHTTPHandler) Routes() []core_http_server.Route {
 	return []core_http_server.Route{
 		{
-			Path:    "/",
+			Method:  http.MethodGet,
+			Path:    "/{$}",
 			Handler: h.GetMainPage,
 		},
 	}

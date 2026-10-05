@@ -16,6 +16,7 @@ import (
 // @Success 		204	"Успешное удаление пользователя"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
 // @Failure 		404 {object} core_http_response.ErrorResponse "Not found"
+// @Failure 		409 {object} core_http_response.ErrorResponse "У пользователя есть задачи"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"
 // @Router 			/users/{id} [delete]
 func (h *UsersHTTPHandler) DeleteUser(rw http.ResponseWriter, r *http.Request) {

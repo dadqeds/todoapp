@@ -13,10 +13,11 @@ type GetTasksResponse []TaskDTOResponse
 
 // GetTasks 		godoc
 // @Summary 		Список задач
-// @Description 	Просмотр списка задач с опцианальной пагинацией
+// @Description 	Просмотр списка задач с опциональной фильтрацией по автору и пагинацией
 // @Tags 			tasks
 // @Produce 		json
-// @Param 			limit query int false "Размер страницы с задачами"
+// @Param 			user_id query int false "Фильтрация задач по ID автора"
+// @Param 			limit query int false "Размер страницы с задачами (по умолчанию 50, максимум 500)"
 // @Param			offset query int false "Смещение страницы с задачами"
 // @Success 		200 {object} GetTasksResponse "Успешное получение списка задач"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
@@ -31,7 +32,7 @@ func (h *TasksHTTPHandler) GetTasks(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		responseHandler.ErrorResponse(
 			err,
-			"failed to get UserID/Limit/Offset qery params",
+			"failed to get UserID/Limit/Offset query params",
 		)
 
 		return

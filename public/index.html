@@ -511,7 +511,7 @@
       }
       .bars {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         align-items: end;
         gap: 20px;
         height: 220px;
@@ -816,7 +816,8 @@
     </div>
     <div class="toast-wrap" id="toasts"></div>
     <script>
-      const API_BASE = "http://127.0.0.1:5050/api/v1";
+      // Относительный путь: UI и API отдаются одним сервером, CORS не нужен.
+      const API_BASE = "/api/v1";
       const state = {
         page: "tasks",
         tasks: [],
@@ -910,7 +911,7 @@
         } catch (e) {
           if (e.name === "TypeError")
             throw new Error(
-              "Не удалось подключиться к API. Проверьте, что backend запущен на 127.0.0.1:5050.",
+              "Не удалось подключиться к API. Проверьте, что backend запущен.",
             );
           throw e;
         }
@@ -1058,7 +1059,7 @@
           ? state.users
           : await api("/users?limit=200&offset=0");
         $("#modal").innerHTML =
-          `<div class="modal-head"><h2 class="modal-title">${id ? "Редактировать задачу" : "Новая задача"}</h2><button class="btn icon" id="closeModal">×</button></div><form class="form" id="taskForm">${id ? "" : `<label>Автор<select class="control" id="taskAuthor" required>${users.map(u => `<option value="${u.id}">${esc(u.full_name)} · ID ${u.id}</option>`).join("")}</select></label>`}<label>Название<input class="control" id="taskTitle" maxlength="200" minlength="1" required value="${esc(t?.title || "")}"></label><label>Описание<span class="hint"> — можно оставить пустым</span><textarea class="control" id="taskDesc">${esc(t?.description || "")}</textarea></label><label>Статус<select class="control" id="taskCompleted"><option value="false" ${!t?.completed ? "selected" : ""}>Открыта</option><option value="true" ${t?.completed ? "selected" : ""}>Выполнена</option></select></label><div class="form-actions"><button type="button" class="btn" id="cancelModal">Отмена</button><button class="btn primary">${id ? "Сохранить" : "Создать задачу"}</button></div></form>`;
+          `<div class="modal-head"><h2 class="modal-title">${id ? "Редактировать задачу" : "Новая задача"}</h2><button class="btn icon" id="closeModal">×</button></div><form class="form" id="taskForm">${id ? "" : `<label>Автор<select class="control" id="taskAuthor" required>${users.map(u => `<option value="${u.id}">${esc(u.full_name)} · ID ${u.id}</option>`).join("")}</select></label>`}<label>Название<input class="control" id="taskTitle" maxlength="100" minlength="1" required value="${esc(t?.title || "")}"></label><label>Описание<span class="hint"> — можно оставить пустым</span><textarea class="control" id="taskDesc" maxlength="1000">${esc(t?.description || "")}</textarea></label><label>Статус<select class="control" id="taskCompleted"><option value="false" ${!t?.completed ? "selected" : ""}>Открыта</option><option value="true" ${t?.completed ? "selected" : ""}>Выполнена</option></select></label><div class="form-actions"><button type="button" class="btn" id="cancelModal">Отмена</button><button class="btn primary">${id ? "Сохранить" : "Создать задачу"}</button></div></form>`;
         showModal();
         $("#closeModal").onclick = closeModal;
         $("#cancelModal").onclick = closeModal;
@@ -1245,11 +1246,11 @@
       }
       function renderStats(s) {
         const created = Number(s?.tasks_created || 0),
-          completed = Number(s?.tasks_complited || 0),
-          rate = Number(s?.tasks_complited_rate || 0),
+          completed = Number(s?.tasks_completed || 0),
+          rate = Math.round(Number(s?.tasks_completed_rate || 0) * 10) / 10,
           avg = esc(s?.tasks_average_completion_time || "—");
         $("#page-content").innerHTML =
-          `<div class="filters stats"><div class="field-label">Пользователь</div><select class="control" id="statUser"><option value="">Все</option>${state.users.map(u => `<option value="${u.id}">${esc(u.full_name)}</option>`).join("")}</select><div class="field-label">Период от</div><input class="control" type="date" id="statFrom"><button class="btn reset" id="applyStats">Применить</button></div><div class="stats-grid"><div class="stat-card"><div class="stat-label">Создано задач</div><div class="stat-value">${created}</div></div><div class="stat-card"><div class="stat-label">Выполнено</div><div class="stat-value">${completed}</div></div><div class="stat-card"><div class="stat-label">Процент выполнения</div><div class="stat-value">${rate}%</div></div><div class="stat-card"><div class="stat-label">Среднее время</div><div class="stat-value" style="font-size:25px">${avg}</div></div></div><div class="bar-wrap"><div style="font-size:17px;font-weight:700;margin-bottom:14px">Состояние задач</div><div class="bars"><div class="bar-col"><div class="bar" style="height:${Math.max(5, Math.min(100, created ? ((created - completed) / created) * 100 : 0))}%"></div><div class="bar-label">Открытые</div></div><div class="bar-col"><div class="bar" style="height:${Math.max(5, Math.min(100, rate))}%"></div><div class="bar-label">Выполненные</div></div><div class="bar-col"><div class="bar" style="height:${Math.max(5, Math.min(100, created ? 100 : 5))}%"></div><div class="bar-label">Все</div></div><div class="bar-col"><div class="bar" style="height:${Math.max(5, Math.min(100, Math.min(100, rate * 1.1)))}%"></div><div class="bar-label">Прогресс</div></div></div></div>`;
+          `<div class="filters stats"><div class="field-label">Пользователь</div><select class="control" id="statUser"><option value="">Все</option>${state.users.map(u => `<option value="${u.id}">${esc(u.full_name)}</option>`).join("")}</select><div class="field-label">Период от</div><input class="control" type="date" id="statFrom"><button class="btn reset" id="applyStats">Применить</button></div><div class="stats-grid"><div class="stat-card"><div class="stat-label">Создано задач</div><div class="stat-value">${created}</div></div><div class="stat-card"><div class="stat-label">Выполнено</div><div class="stat-value">${completed}</div></div><div class="stat-card"><div class="stat-label">Процент выполнения</div><div class="stat-value">${rate}%</div></div><div class="stat-card"><div class="stat-label">Среднее время</div><div class="stat-value" style="font-size:25px">${avg}</div></div></div><div class="bar-wrap"><div style="font-size:17px;font-weight:700;margin-bottom:14px">Состояние задач</div><div class="bars"><div class="bar-col"><div class="bar" style="height:${Math.max(5, Math.min(100, created ? ((created - completed) / created) * 100 : 0))}%"></div><div class="bar-label">Открытые</div></div><div class="bar-col"><div class="bar" style="height:${Math.max(5, Math.min(100, rate))}%"></div><div class="bar-label">Выполненные</div></div><div class="bar-col"><div class="bar" style="height:${Math.max(5, Math.min(100, created ? 100 : 5))}%"></div><div class="bar-label">Все</div></div></div></div>`;
         $("#applyStats").onclick = async () => {
           const q = new URLSearchParams();
           const u = $("#statUser").value;

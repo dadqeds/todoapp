@@ -15,6 +15,8 @@ type loggerContextKey struct{}
 
 var (
 	key = loggerContextKey{}
+
+	nopLogger = &Logger{Logger: zap.NewNop()}
 )
 
 type Logger struct {
@@ -35,7 +37,7 @@ func ToContext(ctx context.Context, log *Logger) context.Context {
 func FromContext(ctx context.Context) *Logger {
 	log, ok := ctx.Value(key).(*Logger)
 	if !ok {
-		panic("No logger in context")
+		return nopLogger
 	}
 	return log
 }
@@ -86,7 +88,13 @@ func (l *Logger) With(field ...zap.Field) *Logger {
 }
 
 func (l *Logger) Close() {
+	_ = l.Sync()
+
+	if l.file == nil {
+		return
+	}
+
 	if err := l.file.Close(); err != nil {
-		fmt.Println("failed close logger file: %w", err)
+		fmt.Println("failed close logger file:", err)
 	}
 }

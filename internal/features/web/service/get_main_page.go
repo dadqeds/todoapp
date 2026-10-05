@@ -2,17 +2,12 @@ package web_service
 
 import (
 	"fmt"
-	"os"
-	"path"
 )
 
-func (s *WebService) GetMainPage() ([]byte, error) {
-	htmlFilePath := path.Join(
-		os.Getenv("PROJECT_ROOT"),
-		"/public/index.html",
-	)
+const mainPageFilePath = "index.html"
 
-	html, err := s.webRepository.GetFile(htmlFilePath)
+func (s *WebService) GetMainPage() ([]byte, error) {
+	html, err := s.webRepository.GetFile(mainPageFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("get file from repository: %w", err)
 	}

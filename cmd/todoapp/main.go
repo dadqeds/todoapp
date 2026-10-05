@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,6 +24,7 @@ import (
 	web_fs_repository "github.com/dadqeds/todoapp/internal/features/web/repository/file_system"
 	web_service "github.com/dadqeds/todoapp/internal/features/web/service"
 	web_transport_http "github.com/dadqeds/todoapp/internal/features/web/transport/http"
+	"github.com/dadqeds/todoapp/public"
 	"go.uber.org/zap"
 
 	_ "github.com/dadqeds/todoapp/docs"
@@ -37,9 +37,17 @@ var (
 // @title			Golang Todo API
 // @version  		1.0
 // @description		Todo Application REST-API scheme
-// @host			127.0.0.1:5050
 // @BasePath		/api/v1
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "todoapp:", err)
+		os.Exit(1)
+	}
+}
+
+// run держит всю инициализацию отдельно от main, чтобы defer-ы
+// (закрытие пула, логгера) гарантированно выполнялись до os.Exit.
+func run() error {
 	time.Local = timeZone
 
 	ctx, cancel := signal.NotifyContext(
@@ -50,50 +58,51 @@ func main() {
 
 	logger, err := core_logger.NewLogger(core_logger.NewConfigMust())
 	if err != nil {
-		fmt.Println("failed to init applecation logger:", err)
-		os.Exit(1)
+		return fmt.Errorf("init application logger: %w", err)
 	}
 	defer logger.Close()
 
 	logger.Debug("application time zone", zap.Any("zone", timeZone))
 
-	logger.Debug("initiazling postgres connection pool")
+	logger.Debug("initializing postgres connection pool")
 
 	pool, err := core_pgx_pool.NewPool(
 		ctx,
 		core_pgx_pool.NewConfigMust(),
 	)
 	if err != nil {
-		log.Fatal("failed to init postgres connection pool", zap.Error(err))
+		logger.Error("failed to init postgres connection pool", zap.Error(err))
+		return fmt.Errorf("init postgres connection pool: %w", err)
 	}
 	defer pool.Close()
 
-	logger.Debug("initiazling feature", zap.String("feature", "users"))
+	logger.Debug("initializing feature", zap.String("feature", "users"))
 	usersRepository := users_postgres_repository.NewUsersRepository(pool)
 	usersService := users_service.NewUserService(usersRepository)
 	usersTransportHTTP := users_transport_http.NewUsersHTTPHandler(usersService)
 
-	logger.Debug("initiazling feature", zap.String("feature", "tasks"))
+	logger.Debug("initializing feature", zap.String("feature", "tasks"))
 	tasksRepository := tasks_postgres_repository.NewTasksRepository(pool)
 	tasksService := tasks_service.NewTasksService(tasksRepository)
 	tasksTransportHTTP := tasks_transport_http.NewTasksHTTPHandler(tasksService)
 
-	logger.Debug("initiazling feature", zap.String("feature", "statistics"))
+	logger.Debug("initializing feature", zap.String("feature", "statistics"))
 	statisticsRepository := statistics_postgres_repository.NewStatisticsRepository(pool)
 	statisticsService := statistics_service.NewStatisticsService(statisticsRepository)
 	statisticsTransportHTTP := statistics_transport_http.NewStatisticsHTTPHandler(statisticsService)
 
-	logger.Debug("initiazling feature", zap.String("feature", "web"))
-	webRepository := web_fs_repository.NewWebRepository()
+	logger.Debug("initializing feature", zap.String("feature", "web"))
+	webRepository := web_fs_repository.NewWebRepository(public.FS)
 	webService := web_service.NewWebService(webRepository)
 	webTransportHTTP := web_transport_http.NewWebHTTPHandler(webService)
 
-	logger.Debug("initiazling HTTP server")
+	logger.Debug("initializing HTTP server")
 
+	httpConfig := core_http_server.NewConfigMust()
 	httpServer := core_http_server.NewHTTPServer(
-		core_http_server.NewConfigMust(),
+		httpConfig,
 		logger,
-		core_http_middleware.CORS(),
+		core_http_middleware.CORS(httpConfig.CORSAllowedOrigins),
 		core_http_middleware.RequestID(),
 		core_http_middleware.Logger(logger),
 		core_http_middleware.Trace(),
@@ -114,5 +123,8 @@ func main() {
 
 	if err := httpServer.Run(ctx); err != nil {
 		logger.Error("HTTP server run error", zap.Error(err))
+		return fmt.Errorf("run HTTP server: %w", err)
 	}
+
+	return nil
 }
