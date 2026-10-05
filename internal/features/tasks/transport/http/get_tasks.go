@@ -15,12 +15,14 @@ type GetTasksResponse []TaskDTOResponse
 // @Summary 		Список задач
 // @Description 	Просмотр списка задач с опциональной фильтрацией по автору и пагинацией
 // @Tags 			tasks
+// @Security 		TelegramInitData
 // @Produce 		json
 // @Param 			user_id query int false "Фильтрация задач по ID автора"
 // @Param 			limit query int false "Размер страницы с задачами (по умолчанию 50, максимум 500)"
 // @Param			offset query int false "Смещение страницы с задачами"
 // @Success 		200 {object} GetTasksResponse "Успешное получение списка задач"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"
 // @Router 			/tasks [get]
 func (h *TasksHTTPHandler) GetTasks(rw http.ResponseWriter, r *http.Request) {

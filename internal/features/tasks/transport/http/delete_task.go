@@ -12,9 +12,11 @@ import (
 // @Summary 		Удаление задачи
 // @Description 	Удаление существующей задачи по ее ID
 // @Tags 			tasks
+// @Security 		TelegramInitData
 // @Param			id path int true "ID удаляемой задачи"
 // @Success 		204	"Успешное удаление задачи"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
 // @Failure 		404 {object} core_http_response.ErrorResponse "Not found"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"
 // @Router 			/tasks/{id} [delete]

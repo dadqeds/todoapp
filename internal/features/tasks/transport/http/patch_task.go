@@ -29,12 +29,14 @@ type PatchTaskResponse TaskDTOResponse
 // @Description 	Ограничения: 'title' и 'completed' не могут быть выставлены как null
 // @Description 	Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
 // @Tags 			tasks
+// @Security 		TelegramInitData
 // @Accept 			json
 // @Produce 		json
 // @Param 			id path int true "ID изменяемой задачи"
 // @Param 			request body PatchTaskRequest true "PatchTask тело запроса"
 // @Success 		200 {object} PatchTaskResponse "Успешно изменённая задача"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
 // @Failure 		404 {object} core_http_response.ErrorResponse "Not found"
 // @Failure 		409 {object} core_http_response.ErrorResponse "Conflict"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"

@@ -16,7 +16,7 @@ type Config struct {
 	IdleTimeout       time.Duration `envconfig:"IDLE_TIMEOUT"         default:"60s"`
 
 	CORSAllowedOrigins []string `envconfig:"CORS_ALLOWED_ORIGINS"`
-	SwaggerEnabled     bool     `envconfig:"SWAGGER_ENABLED"      default:"true"`
+	SwaggerEnabled     bool     `envconfig:"SWAGGER_ENABLED"      default:"false"`
 }
 
 func NewConfig() (Config, error) {

@@ -14,10 +14,12 @@ type GetUserResponse UserDTOResponse
 // @Summary 		Получение пользователя
 // @Description 	Получение конкретного пользователя по его ID
 // @Tags 			users
+// @Security 		TelegramInitData
 // @Produce 		json
 // @Param			id path int true "ID получаемого пользователя"
 // @Success 		200 {object} GetUserResponse "Пользователь успешно найден"
 // @Failure 		400 {object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
 // @Failure 		404 {object} core_http_response.ErrorResponse "Not found"
 // @Failure 		500 {object} core_http_response.ErrorResponse "Internal server error"
 // @Router 			/users/{id} [get]

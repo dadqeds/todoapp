@@ -12,6 +12,10 @@ func (s *UsersService) GetUsers(
 	limit *int,
 	offset *int,
 ) ([]domain.User, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
 	l, o, err := domain.NormalizePagination(limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("normalize pagination: %w", err)

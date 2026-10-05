@@ -10,7 +10,7 @@ import (
 )
 
 type CreateUserRequest struct {
-	FullName    string  `json:"full_name" validate:"required,min=3,max=100"                     example:"Ivan Ivanov"`
+	FullName    string  `json:"full_name" validate:"required,min=1,max=100"                     example:"Ivan Ivanov"`
 	PhoneNumber *string `json:"phone_number" validate:"omitempty,min=10,max=15,startswith=+"    example:"+79998887766"`
 }
 
@@ -20,11 +20,14 @@ type CreateUserResponse UserDTOResponse
 // @Summary 		Создать пользователя
 // @Description 	Создать нового пользователя в системе
 // @Tags 			users
+// @Security 		TelegramInitData
 // @Accept 			json
 // @Produce 		json
 // @Param			request body CreateUserRequest true "CreateUser тело запроса"
 // @Success 201		{object} CreateUserResponse "Успешно созданный пользователь"
 // @Failure 400 	{object} core_http_response.ErrorResponse "Bad request"
+// @Failure 		401 {object} core_http_response.ErrorResponse "Нет или неверные данные Telegram"
+// @Failure 		403 {object} core_http_response.ErrorResponse "Только для администратора"
 // @Failure 500 	{object} core_http_response.ErrorResponse "Internal server error"
 // @Router 			/users [post]
 func (h *UsersHTTPHandler) CreateUser(rw http.ResponseWriter, r *http.Request) {

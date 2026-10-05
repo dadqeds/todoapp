@@ -1,5 +1,8 @@
 // Относительный путь: UI и API отдаются одним сервером, CORS не нужен.
 const API_BASE = "/api/v1";
+// Telegram Mini App. Вне Telegram (локальный адрес) объект есть, но initData пустой.
+const tg = window.Telegram?.WebApp;
+const inTelegram = Boolean(tg?.initData);
 // Справочник пользователей для имён, фильтров и выпадающих списков.
 // Хранится отдельно от постраничного списка на странице «Пользователи».
 const DIRECTORY_LIMIT = 500;
@@ -17,6 +20,7 @@ const state = {
   directory: [],
   directoryLoaded: false,
   stats: null,
+  me: null,
   statsFilter: { user: "", from: "", to: "" },
 };
 const $ = s => document.querySelector(s);
@@ -80,6 +84,8 @@ function toast(message, error = false) {
 // на английском, показывать его пользователю не стоит.
 const DEFAULT_MESSAGES = {
   400: "Проверьте введённые данные.",
+  401: "Откройте приложение через Telegram-бота.",
+  403: "Недостаточно прав.",
   404: "Запись не найдена — возможно, её уже удалили.",
   409: "Данные изменились в другом окне. Список обновлён, повторите действие.",
 };
@@ -96,6 +102,8 @@ async function api(path, options = {}, messages = {}) {
       ...options,
       headers: {
         "Content-Type": "application/json",
+        // Сервер проверяет подпись initData токеном бота.
+        ...(inTelegram ? { Authorization: `tma ${tg.initData}` } : {}),
         ...(options.headers || {}),
       },
     });
@@ -134,8 +142,15 @@ async function fetchPage(path, limit, offset) {
   const list = Array.isArray(items) ? items : [];
   return { items: list.slice(0, limit), hasMore: list.length > limit };
 }
+const isAdmin = () => Boolean(state.me?.is_admin);
 async function loadDirectory(force = false) {
   if (state.directoryLoaded && !force) return state.directory;
+  // Обычному пользователю список всех пользователей недоступен — только он сам.
+  if (!isAdmin()) {
+    state.directory = state.me ? [state.me] : [];
+    state.directoryLoaded = true;
+    return state.directory;
+  }
   const users = await api(`/users?limit=${DIRECTORY_LIMIT}&offset=0`);
   state.directory = Array.isArray(users) ? users : [];
   state.directoryLoaded = true;
@@ -225,7 +240,7 @@ function renderTasks() {
       : `<h3>У этого пользователя нет задач</h3><p>Выберите другого пользователя или сбросьте фильтр</p>`;
   $("#page-content").innerHTML = `
     <div class="filters">
-      <label class="field-label" for="taskUser">Пользователь</label><select class="control" id="taskUser">${userOptions}</select>
+      ${isAdmin() ? `<label class="field-label" for="taskUser">Пользователь</label><select class="control" id="taskUser">${userOptions}</select>` : ""}
       <label class="field-label" for="taskLimit">На странице</label>${limitSelect("taskLimit", state.taskLimit)}
       <button class="btn reset" id="resetTasks">Сбросить</button>
     </div>
@@ -236,7 +251,7 @@ function renderTasks() {
     }</div>
     ${pager(state.taskPage, state.taskHasMore, "prevTask", "nextTask")}`;
 
-  $("#taskUser").onchange = e => {
+  if (isAdmin()) $("#taskUser").onchange = e => {
     state.taskUser = e.target.value;
     state.taskPage = 0;
     loadTasks();
@@ -314,6 +329,7 @@ async function toggleTask(id) {
       body: JSON.stringify({ completed: !t.completed, version: t.version }),
     });
     toast(t.completed ? "Задача возвращена в работу" : "Задача выполнена");
+    if (inTelegram && !t.completed) tg.HapticFeedback?.notificationOccurred("success");
     loadTasks();
   } catch (err) {
     handleMutationError(err, loadTasks);
@@ -331,14 +347,14 @@ async function openTaskModal(id = null) {
     handleMutationError(e, loadTasks);
     return;
   }
-  if (!id && !users.length) {
+  if (!id && isAdmin() && !users.length) {
     toast("Сначала создайте пользователя — задаче нужен автор.", true);
     return;
   }
   $("#modal").innerHTML = `
     <div class="modal-head"><h2 class="modal-title" id="modalTitle">${id ? "Редактировать задачу" : "Новая задача"}</h2><button class="btn icon" id="closeModal" aria-label="Закрыть">×</button></div>
     <form class="form" id="taskForm">
-      ${id ? "" : `<label>Автор<select class="control" id="taskAuthor" required>${users.map(u => `<option value="${u.id}" ${String(u.id) === String(state.taskUser) ? "selected" : ""}>${esc(u.full_name)} · ID ${u.id}</option>`).join("")}</select></label>`}
+      ${id || !isAdmin() ? "" : `<label>Автор<select class="control" id="taskAuthor" required>${users.map(u => `<option value="${u.id}" ${String(u.id) === String(state.taskUser) ? "selected" : ""}>${esc(u.full_name)} · ID ${u.id}</option>`).join("")}</select></label>`}
       <label>Название<input class="control" id="taskTitle" maxlength="100" required value="${esc(t?.title || "")}"></label>
       <label>Описание<span class="hint"> — можно оставить пустым</span><textarea class="control" id="taskDesc" maxlength="1000">${esc(t?.description || "")}</textarea></label>
       ${id ? `<label>Статус<select class="control" id="taskCompleted"><option value="false" ${!t.completed ? "selected" : ""}>Открыта</option><option value="true" ${t.completed ? "selected" : ""}>Выполнена</option></select></label>` : ""}
@@ -377,7 +393,7 @@ async function openTaskModal(id = null) {
           {
             method: "POST",
             body: JSON.stringify({
-              author_user_id: Number($("#taskAuthor").value),
+              author_user_id: isAdmin() ? Number($("#taskAuthor").value) : undefined,
               title,
               description: description || undefined,
             }),
@@ -395,7 +411,7 @@ async function openTaskModal(id = null) {
   };
 }
 async function deleteTask(id) {
-  if (!confirm("Удалить эту задачу?")) return;
+  if (!(await ask("Удалить эту задачу?"))) return;
   try {
     await api(`/tasks/${id}`, { method: "DELETE" });
     toast("Задача удалена");
@@ -524,7 +540,7 @@ async function openUserModal(id = null) {
   };
 }
 async function deleteUser(id) {
-  if (!confirm("Удалить пользователя?")) return;
+  if (!(await ask("Удалить пользователя?"))) return;
   try {
     await api(
       `/users/${id}`,
@@ -589,7 +605,7 @@ function renderStats(s) {
     .join("");
   $("#page-content").innerHTML = `
     <div class="filters stats">
-      <label class="field-label" for="statUser">Пользователь</label><select class="control" id="statUser"><option value="">Все</option>${userOptions}</select>
+      ${isAdmin() ? `<label class="field-label" for="statUser">Пользователь</label><select class="control" id="statUser"><option value="">Все</option>${userOptions}</select>` : ""}
       <label class="field-label" for="statFrom">С</label><input class="control" type="date" id="statFrom" value="${esc(f.from)}">
       <label class="field-label" for="statTo">По</label><input class="control" type="date" id="statTo" value="${esc(f.to)}">
       <div class="filter-actions"><button class="btn reset" id="applyStats">Применить</button><button class="btn reset" id="resetStats">Сбросить</button></div>
@@ -611,13 +627,21 @@ function renderStats(s) {
       toast("Дата «по» не может быть раньше даты «с».", true);
       return;
     }
-    state.statsFilter = { user: $("#statUser").value, from, to };
+    state.statsFilter = { user: isAdmin() ? $("#statUser").value : "", from, to };
     loadStats();
   };
   $("#resetStats").onclick = () => {
     state.statsFilter = { user: "", from: "", to: "" };
     loadStats();
   };
+}
+
+// В Telegram нативный confirm() работает не во всех клиентах — используем его попап.
+function ask(message) {
+  if (inTelegram && tg.showConfirm) {
+    return new Promise(resolve => tg.showConfirm(message, resolve));
+  }
+  return Promise.resolve(confirm(message));
 }
 
 // ---------- Модальное окно ----------
@@ -630,11 +654,13 @@ function showModal() {
   $("#closeModal").onclick = closeModal;
   $("#cancelModal").onclick = closeModal;
   $("#modal").querySelector(".control")?.focus();
+  if (inTelegram) tg.BackButton.show();
 }
 function closeModal() {
   if (!isModalOpen()) return;
   $("#modalBackdrop").classList.remove("show");
   document.body.style.overflow = "";
+  if (inTelegram) tg.BackButton.hide();
   if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
 }
 $("#modalBackdrop").addEventListener("click", e => {
@@ -675,13 +701,19 @@ async function switchPage(page) {
 document
   .querySelectorAll(".nav button")
   .forEach(b => (b.onclick = () => switchPage(b.dataset.page)));
-let savedTheme = null;
-try {
-  savedTheme = localStorage.getItem("todo-theme");
-} catch {}
-const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-if (savedTheme === "dark" || (!savedTheme && prefersDark))
-  document.body.classList.add("dark");
+function applyTheme() {
+  if (inTelegram) {
+    // В Telegram тема берётся из клиента, переключатель не нужен.
+    document.body.classList.toggle("dark", tg.colorScheme === "dark");
+    return;
+  }
+  let savedTheme = null;
+  try {
+    savedTheme = localStorage.getItem("todo-theme");
+  } catch {}
+  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  document.body.classList.toggle("dark", savedTheme === "dark" || (!savedTheme && prefersDark));
+}
 $("#themeSwitch").onclick = () => {
   document.body.classList.toggle("dark");
   try {
@@ -691,5 +723,37 @@ $("#themeSwitch").onclick = () => {
     );
   } catch {}
 };
-setActive();
-loadTasks();
+
+// Интерфейс зависит от роли: администратору доступны все пользователи.
+function applyRole() {
+  document.querySelector('.nav button[data-page="users"]').hidden = !isAdmin();
+  $("#meName").textContent = state.me ? state.me.full_name : "";
+}
+
+async function start() {
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    tg.onEvent("themeChanged", applyTheme);
+    tg.BackButton.onClick(closeModal);
+    if (inTelegram) $(".theme-box").hidden = true;
+  }
+  applyTheme();
+  setActive();
+  renderShell("Загрузка", "");
+  renderLoader();
+  try {
+    state.me = await api("/me");
+  } catch (e) {
+    renderShell("TodoApp", "");
+    renderError(
+      e.status === 401
+        ? new Error("Откройте приложение через Telegram-бота. Вне Telegram интерфейс доступен только на локальном адресе.")
+        : e,
+    );
+    return;
+  }
+  applyRole();
+  loadTasks();
+}
+start();

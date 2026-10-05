@@ -746,3 +746,19 @@ body.dark .switch span {
     display: none;
   }
 }
+
+/* Атрибут hidden должен побеждать display у кнопок навигации и блока темы. */
+[hidden] {
+  display: none !important;
+}
+.me-name {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.me-name:empty {
+  display: none;
+}

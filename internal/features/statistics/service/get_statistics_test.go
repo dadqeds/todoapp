@@ -6,24 +6,32 @@ import (
 	"testing"
 	"time"
 
+	core_auth "github.com/dadqeds/todoapp/internal/core/auth"
+	"github.com/dadqeds/todoapp/internal/core/domain"
 	core_errors "github.com/dadqeds/todoapp/internal/core/errors"
 )
 
 type fakeRepository struct {
-	summary TasksSummary
-	called  bool
+	summary   TasksSummary
+	called    bool
+	gotUserID *int
 }
 
-func (f *fakeRepository) GetTasksSummary(context.Context, *int, *time.Time, *time.Time) (TasksSummary, error) {
+func (f *fakeRepository) GetTasksSummary(_ context.Context, userID *int, _ *time.Time, _ *time.Time) (TasksSummary, error) {
 	f.called = true
+	f.gotUserID = userID
 	return f.summary, nil
+}
+
+func asActor(id int, isAdmin bool) context.Context {
+	return core_auth.ToContext(context.Background(), core_auth.Actor{User: domain.User{ID: id}, IsAdmin: isAdmin})
 }
 
 func TestGetStatistics(t *testing.T) {
 	avg := 90 * time.Minute
 	repo := &fakeRepository{summary: TasksSummary{Created: 4, Completed: 1, AverageCompletionTime: &avg}}
 
-	stats, err := NewStatisticsService(repo).GetStatistics(context.Background(), nil, nil, nil)
+	stats, err := NewStatisticsService(repo).GetStatistics(asActor(1, true), nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +48,7 @@ func TestGetStatistics(t *testing.T) {
 }
 
 func TestGetStatisticsEmpty(t *testing.T) {
-	stats, err := NewStatisticsService(&fakeRepository{}).GetStatistics(context.Background(), nil, nil, nil)
+	stats, err := NewStatisticsService(&fakeRepository{}).GetStatistics(asActor(1, true), nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,11 +63,44 @@ func TestGetStatisticsInvalidRange(t *testing.T) {
 	to := from
 	repo := &fakeRepository{}
 
-	_, err := NewStatisticsService(repo).GetStatistics(context.Background(), nil, &from, &to)
+	_, err := NewStatisticsService(repo).GetStatistics(asActor(1, true), nil, &from, &to)
 	if !errors.Is(err, core_errors.ErrInvalidArgument) {
 		t.Fatalf("err = %v, want ErrInvalidArgument", err)
 	}
 	if repo.called {
 		t.Fatal("repository must not be called for invalid range")
 	}
+}
+
+func TestGetStatisticsScope(t *testing.T) {
+	other := 2
+
+	t.Run("user sees only own statistics", func(t *testing.T) {
+		repo := &fakeRepository{}
+
+		if _, err := NewStatisticsService(repo).GetStatistics(asActor(7, false), &other, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+		if repo.gotUserID == nil || *repo.gotUserID != 7 {
+			t.Fatalf("user_id = %v, want 7", repo.gotUserID)
+		}
+	})
+
+	t.Run("admin may filter by any user", func(t *testing.T) {
+		repo := &fakeRepository{}
+
+		if _, err := NewStatisticsService(repo).GetStatistics(asActor(7, true), &other, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+		if repo.gotUserID == nil || *repo.gotUserID != other {
+			t.Fatalf("user_id = %v, want %d", repo.gotUserID, other)
+		}
+	})
+
+	t.Run("no user in context", func(t *testing.T) {
+		_, err := NewStatisticsService(&fakeRepository{}).GetStatistics(context.Background(), nil, nil, nil)
+		if !errors.Is(err, core_errors.ErrUnauthenticated) {
+			t.Fatalf("err = %v, want ErrUnauthenticated", err)
+		}
+	})
 }

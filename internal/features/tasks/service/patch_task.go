@@ -12,9 +12,9 @@ func (s *TasksService) PatchTask(
 	id int,
 	patch domain.TaskPatch,
 ) (domain.Task, error) {
-	task, err := s.tasksRepository.GetTask(ctx, id)
+	task, err := s.getAccessibleTask(ctx, id)
 	if err != nil {
-		return domain.Task{}, fmt.Errorf("get task: %w", err)
+		return domain.Task{}, err
 	}
 
 	if err := task.ApplyPatch(patch); err != nil {

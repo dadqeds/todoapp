@@ -70,6 +70,7 @@ logs-cleanup:
 todoapp-run:
 	@LOGGER_FOLDER=${PROJECT_ROOT}/out/logs \
 	POSTGRES_HOST=localhost \
+	AUTH_LOCAL_ADDR=$${AUTH_LOCAL_ADDR:-127.0.0.1:5051} \
 	go run ${PROJECT_ROOT}/cmd/todoapp
 
 todoapp-deploy:

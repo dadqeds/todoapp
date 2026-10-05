@@ -27,7 +27,10 @@ definitions:
   internal_features_tasks_transport_http.CreateTaskRequest:
     properties:
       author_user_id:
+        description: Учитывается только для администратора, остальным автором ставится
+          текущий пользователь.
         example: 1
+        minimum: 1
         type: integer
       description:
         example: 2 литра, 3.2%
@@ -40,7 +43,6 @@ definitions:
         minLength: 1
         type: string
     required:
-    - author_user_id
     - title
     type: object
   internal_features_tasks_transport_http.CreateTaskResponse:
@@ -139,7 +141,7 @@ definitions:
       full_name:
         example: Ivan Ivanov
         maxLength: 100
-        minLength: 3
+        minLength: 1
         type: string
       phone_number:
         example: "+79998887766"
@@ -160,6 +162,30 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      telegram_id:
+        example: 123456789
+        type: integer
+      version:
+        example: 3
+        type: integer
+    type: object
+  internal_features_users_transport_http.GetMeResponse:
+    properties:
+      full_name:
+        example: Ivan Ivanov
+        type: string
+      id:
+        example: 10
+        type: integer
+      is_admin:
+        example: false
+        type: boolean
+      phone_number:
+        example: "+79998887766"
+        type: string
+      telegram_id:
+        example: 123456789
+        type: integer
       version:
         example: 3
         type: integer
@@ -175,6 +201,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      telegram_id:
+        example: 123456789
+        type: integer
       version:
         example: 3
         type: integer
@@ -202,6 +231,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      telegram_id:
+        example: 123456789
+        type: integer
       version:
         example: 3
         type: integer
@@ -217,6 +249,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      telegram_id:
+        example: 123456789
+        type: integer
       version:
         example: 3
         type: integer
@@ -227,6 +262,26 @@ info:
   title: Golang Todo API
   version: "1.0"
 paths:
+  /me:
+    get:
+      description: Пользователь, от имени которого выполняется запрос. Создаётся автоматически
+        при первом входе через Telegram
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Текущий пользователь
+          schema:
+            $ref: '#/definitions/internal_features_users_transport_http.GetMeResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Текущий пользователь
+      tags:
+      - users
   /statistics:
     get:
       description: Получение статистики по задачам с опциональной фильтрацией по user_id
@@ -257,10 +312,16 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Получение статистики
       tags:
       - statistics
@@ -293,10 +354,16 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Список задач
       tags:
       - tasks
@@ -322,6 +389,10 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "404":
           description: Автор не найден
           schema:
@@ -330,6 +401,8 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Создать задачу
       tags:
       - tasks
@@ -349,6 +422,10 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "404":
           description: Not found
           schema:
@@ -357,6 +434,8 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Удаление задачи
       tags:
       - tasks
@@ -379,6 +458,10 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "404":
           description: Not found
           schema:
@@ -387,6 +470,8 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Получение задачи
       tags:
       - tasks
@@ -424,6 +509,10 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "404":
           description: Not found
           schema:
@@ -436,6 +525,8 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Обновить задачу
       tags:
       - tasks
@@ -464,10 +555,20 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "403":
+          description: Только для администратора
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Список пользователей
       tags:
       - users
@@ -493,10 +594,20 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "403":
+          description: Только для администратора
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Создать пользователя
       tags:
       - users
@@ -516,6 +627,14 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "403":
+          description: Только для администратора
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "404":
           description: Not found
           schema:
@@ -528,6 +647,8 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Удаление пользователя
       tags:
       - users
@@ -550,6 +671,10 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "404":
           description: Not found
           schema:
@@ -558,6 +683,8 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Получение пользователя
       tags:
       - users
@@ -590,6 +717,10 @@ paths:
           description: Bad request
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
         "404":
           description: Not found
           schema:
@@ -602,7 +733,16 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
       summary: Изменение пользователя
       tags:
       - users
+securityDefinitions:
+  TelegramInitData:
+    description: '"tma <initData>" из Telegram.WebApp.initData. На локальном адресе
+      (AUTH_LOCAL_ADDR) не требуется'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

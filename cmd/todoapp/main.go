@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	core_auth "github.com/dadqeds/todoapp/internal/core/auth"
 	core_logger "github.com/dadqeds/todoapp/internal/core/logger"
 	core_pgx_pool "github.com/dadqeds/todoapp/internal/core/repository/postgres/pool/pgx"
 	core_http_middleware "github.com/dadqeds/todoapp/internal/core/transport/http/middleware"
@@ -38,6 +40,10 @@ var (
 // @version  		1.0
 // @description		Todo Application REST-API scheme
 // @BasePath		/api/v1
+// @securityDefinitions.apikey	TelegramInitData
+// @in							header
+// @name						Authorization
+// @description				"tma <initData>" из Telegram.WebApp.initData. На локальном адресе (AUTH_LOCAL_ADDR) не требуется
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "todoapp:", err)
@@ -96,35 +102,88 @@ func run() error {
 	webService := web_service.NewWebService(webRepository)
 	webTransportHTTP := web_transport_http.NewWebHTTPHandler(webService, public.FS)
 
-	logger.Debug("initializing HTTP server")
+	logger.Debug("initializing HTTP servers")
 
 	httpConfig := core_http_server.NewConfigMust()
-	httpServer := core_http_server.NewHTTPServer(
-		httpConfig,
-		logger,
-		core_http_middleware.CORS(httpConfig.CORSAllowedOrigins),
-		core_http_middleware.RequestID(),
-		core_http_middleware.Logger(logger),
-		core_http_middleware.Trace(),
-		core_http_middleware.Panic(),
-	)
-	apiVersionRouterV1 := core_http_server.NewAPIVersionRouter(core_http_server.ApiVersion1)
-	apiVersionRouterV1.RegisterRouters(usersTransportHTTP.Routes()...)
-	apiVersionRouterV1.RegisterRouters(tasksTransportHTTP.Routes()...)
-	apiVersionRouterV1.RegisterRouters(statisticsTransportHTTP.Routes()...)
+	authConfig := core_auth.NewConfigMust()
 
-	httpServer.RegisterAPIRouters(
-		apiVersionRouterV1,
-	)
+	if authConfig.TelegramBotToken == "" {
+		logger.Warn("AUTH_TELEGRAM_BOT_TOKEN is not set: API on public address will reject all requests")
+	}
 
-	httpServer.RegisterRoutes(webTransportHTTP.Routes()...)
+	apiRoutes := [][]core_http_server.Route{
+		usersTransportHTTP.Routes(),
+		tasksTransportHTTP.Routes(),
+		statisticsTransportHTTP.Routes(),
+	}
 
-	httpServer.RegisterSwagger()
+	newServer := func(config core_http_server.Config, auth core_http_middleware.Middleware) *core_http_server.HTTPServer {
+		server := core_http_server.NewHTTPServer(
+			config,
+			logger,
+			core_http_middleware.CORS(config.CORSAllowedOrigins),
+			core_http_middleware.RequestID(),
+			core_http_middleware.Logger(logger),
+			core_http_middleware.Trace(),
+			core_http_middleware.Panic(),
+		)
 
-	if err := httpServer.Run(ctx); err != nil {
+		apiVersionRouterV1 := core_http_server.NewAPIVersionRouter(core_http_server.ApiVersion1, auth)
+		for _, routes := range apiRoutes {
+			apiVersionRouterV1.RegisterRouters(routes...)
+		}
+
+		server.RegisterAPIRouters(apiVersionRouterV1)
+		server.RegisterRoutes(webTransportHTTP.Routes()...)
+		server.RegisterSwagger()
+
+		return server
+	}
+
+	// Публичный адрес: сюда смотрит туннель, доступ только с initData Telegram.
+	servers := []*core_http_server.HTTPServer{
+		newServer(httpConfig, core_http_middleware.TelegramAuth(authConfig, usersService)),
+	}
+
+	// Локальный адрес: без Telegram, от имени AUTH_LOCAL_TELEGRAM_ID с правами
+	// администратора. Swagger здесь включён всегда.
+	if authConfig.LocalAddr != "" {
+		localConfig := httpConfig
+		localConfig.Addr = authConfig.LocalAddr
+		localConfig.SwaggerEnabled = true
+
+		servers = append(servers, newServer(localConfig, core_http_middleware.LocalAuth(authConfig.LocalTelegramID, usersService)))
+	}
+
+	if err := runServers(ctx, servers); err != nil {
 		logger.Error("HTTP server run error", zap.Error(err))
-		return fmt.Errorf("run HTTP server: %w", err)
+		return fmt.Errorf("run HTTP servers: %w", err)
 	}
 
 	return nil
+}
+
+// runServers запускает все серверы и останавливает их вместе: при ошибке
+// одного или по сигналу завершения.
+func runServers(ctx context.Context, servers []*core_http_server.HTTPServer) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	errs := make(chan error, len(servers))
+	for _, server := range servers {
+		go func() {
+			err := server.Run(ctx)
+			cancel()
+			errs <- err
+		}()
+	}
+
+	var errList []error
+	for range servers {
+		if err := <-errs; err != nil {
+			errList = append(errList, err)
+		}
+	}
+
+	return errors.Join(errList...)
 }

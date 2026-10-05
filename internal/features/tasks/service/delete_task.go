@@ -9,6 +9,10 @@ func (s *TasksService) DeleteTask(
 	ctx context.Context,
 	id int,
 ) error {
+	if _, err := s.getAccessibleTask(ctx, id); err != nil {
+		return err
+	}
+
 	if err := s.tasksRepository.DeleteTask(ctx, id); err != nil {
 		return fmt.Errorf(
 			"delete task from repository: %w",
