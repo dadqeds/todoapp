@@ -111,6 +111,8 @@ todoapp-undeploy:
 # На сервере (в .env задан COMPOSE_FILE с docker-compose.prod.yaml):
 # база, миграции, приложение и Caddy с HTTPS.
 server-up:
+	@install -d -o 10001 -g 10001 ${PROJECT_ROOT}/out/logs
+	@chown -R 10001:10001 ${PROJECT_ROOT}/out/logs
 	@docker compose up -d todoapp-postgres
 	@$(MAKE) --no-print-directory migrate-up
 	@docker compose up -d --build todoapp caddy
