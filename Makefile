@@ -48,6 +48,9 @@ migrate-up:
 migrate-down:
 	@$(MAKE) --no-print-directory migrate-action action=down
 
+# search_path=public: таблица версий всегда в public. Иначе, если пользователь БД
+# называется todoapp, как схема приложения, migrate искал бы её в схеме todoapp
+# и запускал миграции с первой.
 migrate-action:
 	@if [ -z "$(action)" ]; then \
 		echo "Отсутствует необходимый параметр action. Пример: make migrate-action action=up"; \
@@ -55,7 +58,7 @@ migrate-action:
 	fi; \
 	docker compose run --rm todoapp-postgres-migrate \
 		-path /migrations \
-		-database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@todoapp-postgres:5432/$${POSTGRES_DB}?sslmode=disable" \
+		-database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@todoapp-postgres:5432/$${POSTGRES_DB}?sslmode=disable&search_path=public" \
 		"$(action)"
 
 BACKUP_DIR := ${PROJECT_ROOT}/out/backups
@@ -111,7 +114,7 @@ todoapp-undeploy:
 # На сервере (в .env задан COMPOSE_FILE с docker-compose.prod.yaml):
 # база, миграции, приложение и Caddy с HTTPS.
 server-up:
-	@install -d -o 10001 -g 10001 ${PROJECT_ROOT}/out/logs
+	@mkdir -p ${PROJECT_ROOT}/out/logs
 	@chown -R 10001:10001 ${PROJECT_ROOT}/out/logs
 	@docker compose up -d todoapp-postgres
 	@$(MAKE) --no-print-directory migrate-up
