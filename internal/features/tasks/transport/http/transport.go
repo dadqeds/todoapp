@@ -20,7 +20,7 @@ type TasksService interface {
 
 	GetTasks(
 		ctx context.Context,
-		userID *int,
+		filter domain.TaskFilter,
 		limit *int,
 		offset *int,
 	) ([]domain.Task, error)

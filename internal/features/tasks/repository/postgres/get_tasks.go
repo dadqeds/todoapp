@@ -3,43 +3,49 @@ package tasks_postgres_repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
 func (r *TasksRepository) GetTasks(
 	ctx context.Context,
-	userID *int,
+	filter domain.TaskFilter,
 	limit int,
 	offset int,
 ) ([]domain.Task, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
 	defer cancel()
 
+	args := []any{limit, offset}
+	conditions := []string{}
+
+	if filter.AuthorUserID != nil {
+		args = append(args, *filter.AuthorUserID)
+		conditions = append(conditions, fmt.Sprintf("author_user_id=$%d", len(args)))
+	}
+
+	if filter.ListID != nil {
+		args = append(args, *filter.ListID)
+		conditions = append(conditions, fmt.Sprintf("list_id=$%d", len(args)))
+	}
+
+	where := ""
+	if len(conditions) > 0 {
+		where = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Сначала невыполненные, среди них — по ближайшему сроку, без срока в конце.
 	query := `
 	SELECT ` + taskColumns + `
 	FROM todoapp.tasks
-	%s
-	ORDER BY id ASC
+	` + where + `
+	ORDER BY completed ASC, due_at ASC NULLS LAST, id DESC
 	LIMIT $1
 	OFFSET $2;
 	`
 
-	args := []any{limit, offset}
-
-	if userID != nil {
-		query = fmt.Sprintf(query, "WHERE author_user_id=$3")
-		args = append(args, *userID)
-	} else {
-		query = fmt.Sprintf(query, "")
-	}
-
-	rows, err := r.pool.Query(
-		ctx,
-		query,
-		args...,
-	)
-
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("select tasks: %w", err)
 	}

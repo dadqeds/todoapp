@@ -104,3 +104,20 @@ func TestGetStatisticsScope(t *testing.T) {
 		}
 	})
 }
+
+func TestOnTimeRate(t *testing.T) {
+	repo := &fakeRepository{summary: TasksSummary{Created: 10, Completed: 8, CompletedWithDue: 6, CompletedOnTime: 5}}
+
+	stats, err := NewStatisticsService(repo).GetStatistics(asActor(1, true), nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.TasksOnTimeRate == nil || int(*stats.TasksOnTimeRate*10) != 833 {
+		t.Fatalf("on-time rate = %v, want 83.3", stats.TasksOnTimeRate)
+	}
+
+	stats, _ = NewStatisticsService(&fakeRepository{summary: TasksSummary{Created: 2, Completed: 2}}).GetStatistics(asActor(1, true), nil, nil, nil)
+	if stats.TasksOnTimeRate != nil {
+		t.Fatalf("no tasks with due: rate = %v, want nil", *stats.TasksOnTimeRate)
+	}
+}

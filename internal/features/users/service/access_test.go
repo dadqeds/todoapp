@@ -39,6 +39,11 @@ func (f *fakeUsersRepository) GetUserByTelegramID(_ context.Context, telegramID 
 	return domain.User{}, core_errors.ErrNotFound
 }
 
+func (f *fakeUsersRepository) PatchUser(_ context.Context, id int, user domain.User) (domain.User, error) {
+	f.users[id] = user
+	return user, nil
+}
+
 func (f *fakeUsersRepository) CreateTelegramUser(_ context.Context, user domain.User) (domain.User, error) {
 	user.ID = 100 + len(f.created)
 	f.created = append(f.created, user)
@@ -103,5 +108,31 @@ func TestResolveTelegramUser(t *testing.T) {
 	}
 	if len(repo.created) != 1 || created.FullName != "Ян" || created.TelegramID == nil || *created.TelegramID != 777 {
 		t.Fatalf("new user not created correctly: %+v", created)
+	}
+}
+
+func TestResolveReplacesLocalPlaceholderName(t *testing.T) {
+	tgID := int64(42)
+	repo := &fakeUsersRepository{users: map[int]domain.User{
+		11: {ID: 11, FullName: core_auth.LocalUserFullName, TelegramID: &tgID},
+	}}
+	s := NewUserService(repo)
+
+	local, _ := s.ResolveTelegramUser(context.Background(), core_auth.TelegramUser{ID: 42, FirstName: core_auth.LocalUserFullName})
+	if local.FullName != core_auth.LocalUserFullName {
+		t.Fatalf("local login must keep placeholder, got %q", local.FullName)
+	}
+
+	user, err := s.ResolveTelegramUser(context.Background(), core_auth.TelegramUser{ID: 42, FirstName: "Оганес"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.FullName != "Оганес" {
+		t.Fatalf("name = %q, want name from Telegram", user.FullName)
+	}
+
+	again, _ := s.ResolveTelegramUser(context.Background(), core_auth.TelegramUser{ID: 42, FirstName: "Другое"})
+	if again.FullName != "Оганес" {
+		t.Fatalf("real name must not be overwritten, got %q", again.FullName)
 	}
 }

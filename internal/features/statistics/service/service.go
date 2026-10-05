@@ -3,6 +3,8 @@ package statistics_service
 import (
 	"context"
 	"time"
+
+	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
 type StatisticsService struct {
@@ -14,6 +16,11 @@ type TasksSummary struct {
 	Created               int
 	Completed             int
 	AverageCompletionTime *time.Duration
+
+	CompletedWithDue int
+	CompletedOnTime  int
+
+	Lists []domain.ListStatistics
 }
 
 type StatisticsRepository interface {

@@ -19,7 +19,7 @@ func (s *UsersService) ResolveTelegramUser(
 ) (domain.User, error) {
 	user, err := s.usersRepository.GetUserByTelegramID(ctx, tgUser.ID)
 	if err == nil {
-		return user, nil
+		return s.replaceLocalPlaceholderName(ctx, user, tgUser), nil
 	}
 	if !errors.Is(err, core_errors.ErrNotFound) {
 		return domain.User{}, fmt.Errorf("get user by telegram id: %w", err)
@@ -36,4 +36,31 @@ func (s *UsersService) ResolveTelegramUser(
 	}
 
 	return user, nil
+}
+
+// replaceLocalPlaceholderName подставляет имя из Telegram, если пользователь
+// был создан на локальном адресе и ещё носит временное имя. Ошибка обновления
+// не мешает входу: имя обновится при следующем запросе.
+func (s *UsersService) replaceLocalPlaceholderName(
+	ctx context.Context,
+	user domain.User,
+	tgUser core_auth.TelegramUser,
+) domain.User {
+	name := tgUser.FullName()
+	if user.FullName != core_auth.LocalUserFullName || name == core_auth.LocalUserFullName {
+		return user
+	}
+
+	renamed := user
+	renamed.FullName = name
+	if err := renamed.Validate(); err != nil {
+		return user
+	}
+
+	patched, err := s.usersRepository.PatchUser(ctx, user.ID, renamed)
+	if err != nil {
+		return user
+	}
+
+	return patched
 }

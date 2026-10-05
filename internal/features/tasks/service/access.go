@@ -28,3 +28,26 @@ func (s *TasksService) getAccessibleTask(ctx context.Context, id int) (domain.Ta
 
 	return task, nil
 }
+
+// resolveTaskList возвращает id списка для задачи автора authorUserID:
+// 0 — список по умолчанию автора, иначе список должен принадлежать автору.
+func (s *TasksService) resolveTaskList(ctx context.Context, listID int, authorUserID int) (int, error) {
+	if listID == 0 {
+		list, err := s.listsRepository.GetOrCreateDefaultList(ctx, authorUserID)
+		if err != nil {
+			return 0, fmt.Errorf("get default list: %w", err)
+		}
+		return list.ID, nil
+	}
+
+	list, err := s.listsRepository.GetList(ctx, listID)
+	if err != nil {
+		return 0, fmt.Errorf("get list: %w", err)
+	}
+
+	if list.OwnerUserID != authorUserID {
+		return 0, fmt.Errorf("list with id='%d': %w", listID, core_errors.ErrNotFound)
+	}
+
+	return list.ID, nil
+}

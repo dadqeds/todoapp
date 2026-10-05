@@ -9,20 +9,155 @@ definitions:
         example: short human-readable message
         type: string
     type: object
+  internal_features_lists_transport_http.CreateListRequest:
+    properties:
+      color:
+        enum:
+        - green
+        - violet
+        - coral
+        - blue
+        - pink
+        - amber
+        example: green
+        type: string
+      title:
+        example: Дом
+        maxLength: 50
+        minLength: 1
+        type: string
+    required:
+    - color
+    - title
+    type: object
+  internal_features_lists_transport_http.ListDTOResponse:
+    properties:
+      color:
+        enum:
+        - green
+        - violet
+        - coral
+        - blue
+        - pink
+        - amber
+        example: green
+        type: string
+      created_at:
+        type: string
+      id:
+        example: 3
+        type: integer
+      is_default:
+        example: false
+        type: boolean
+      owner_user_id:
+        example: 1
+        type: integer
+      title:
+        example: Дом
+        type: string
+      version:
+        example: 1
+        type: integer
+    type: object
+  internal_features_lists_transport_http.ListSummaryDTOResponse:
+    properties:
+      color:
+        enum:
+        - green
+        - violet
+        - coral
+        - blue
+        - pink
+        - amber
+        example: green
+        type: string
+      created_at:
+        type: string
+      id:
+        example: 3
+        type: integer
+      is_default:
+        example: false
+        type: boolean
+      open_tasks:
+        example: 3
+        type: integer
+      owner_user_id:
+        example: 1
+        type: integer
+      title:
+        example: Дом
+        type: string
+      total_tasks:
+        example: 5
+        type: integer
+      version:
+        example: 1
+        type: integer
+    type: object
+  internal_features_lists_transport_http.PatchListRequest:
+    properties:
+      color:
+        example: amber
+        type: string
+      title:
+        example: Дача
+        type: string
+      version:
+        example: 1
+        type: integer
+    type: object
   internal_features_statistics_transport_http.GetStatisticsResponse:
     properties:
+      lists:
+        items:
+          $ref: '#/definitions/internal_features_statistics_transport_http.ListStatisticsResponse'
+        type: array
+      tasks_average_completion_seconds:
+        description: Секунды — чтобы фронт мог показать «1 день 4 ч», а не разбирать
+          строку Go.
+        example: 90
+        type: integer
       tasks_average_completion_time:
         example: 1m30s
         type: string
       tasks_completed:
         example: 10
         type: integer
+      tasks_completed_on_time:
+        example: 5
+        type: integer
       tasks_completed_rate:
         example: 20
         type: number
+      tasks_completed_with_due:
+        example: 6
+        type: integer
       tasks_created:
         example: 50
         type: integer
+      tasks_on_time_rate:
+        example: 83.3
+        type: number
+    type: object
+  internal_features_statistics_transport_http.ListStatisticsResponse:
+    properties:
+      color:
+        example: green
+        type: string
+      list_id:
+        example: 3
+        type: integer
+      tasks_completed:
+        example: 7
+        type: integer
+      tasks_created:
+        example: 9
+        type: integer
+      title:
+        example: Дом
+        type: string
     type: object
   internal_features_tasks_transport_http.CreateTaskRequest:
     properties:
@@ -37,6 +172,19 @@ definitions:
         maxLength: 1000
         minLength: 1
         type: string
+      due_all_day:
+        example: false
+        type: boolean
+      due_at:
+        description: Срок с часовым поясом. Для срока «на весь день» — конец дня по
+          времени пользователя.
+        example: "2026-10-05T18:00:00+03:00"
+        type: string
+      list_id:
+        description: Не указан — список по умолчанию автора.
+        example: 3
+        minimum: 1
+        type: integer
       title:
         example: Купить молоко
         maxLength: 100
@@ -57,7 +205,13 @@ definitions:
         type: string
       description:
         type: string
+      due_all_day:
+        type: boolean
+      due_at:
+        type: string
       id:
+        type: integer
+      list_id:
         type: integer
       title:
         type: string
@@ -76,7 +230,13 @@ definitions:
         type: string
       description:
         type: string
+      due_all_day:
+        type: boolean
+      due_at:
+        type: string
       id:
+        type: integer
+      list_id:
         type: integer
       title:
         type: string
@@ -91,6 +251,16 @@ definitions:
       description:
         example: 2 литра
         type: string
+      due_all_day:
+        example: false
+        type: boolean
+      due_at:
+        description: null снимает срок
+        example: "2026-10-06T10:00:00+03:00"
+        type: string
+      list_id:
+        example: 3
+        type: integer
       title:
         example: Купить молоко
         type: string
@@ -110,7 +280,13 @@ definitions:
         type: string
       description:
         type: string
+      due_all_day:
+        type: boolean
+      due_at:
+        type: string
       id:
+        type: integer
+      list_id:
         type: integer
       title:
         type: string
@@ -129,7 +305,13 @@ definitions:
         type: string
       description:
         type: string
+      due_all_day:
+        type: boolean
+      due_at:
+        type: string
       id:
+        type: integer
+      list_id:
         type: integer
       title:
         type: string
@@ -262,6 +444,162 @@ info:
   title: Golang Todo API
   version: "1.0"
 paths:
+  /lists:
+    get:
+      description: Списки задач текущего пользователя со счётчиками. Список по умолчанию
+        идёт первым и создаётся автоматически. Администратор может передать user_id
+      parameters:
+      - description: Чьи списки показать (только для администратора)
+        in: query
+        name: user_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_features_lists_transport_http.ListSummaryDTOResponse'
+            type: array
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Мои списки
+      tags:
+      - lists
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Новый список
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_features_lists_transport_http.CreateListRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_features_lists_transport_http.ListDTOResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Создать список
+      tags:
+      - lists
+  /lists/{id}:
+    delete:
+      description: Удаляет список вместе со всеми его задачами. Список по умолчанию
+        удалить нельзя (409)
+      parameters:
+      - description: ID списка
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: Список удалён
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "409":
+          description: Список по умолчанию
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Удалить список
+      tags:
+      - lists
+    patch:
+      consumes:
+      - application/json
+      description: Название и цвет. Необязательное поле 'version' защищает от одновременного
+        изменения (409)
+      parameters:
+      - description: ID списка
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Изменения
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_features_lists_transport_http.PatchListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_features_lists_transport_http.ListDTOResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Изменить список
+      tags:
+      - lists
   /me:
     get:
       description: Пользователь, от имени которого выполняется запрос. Создаётся автоматически
@@ -327,11 +665,15 @@ paths:
       - statistics
   /tasks:
     get:
-      description: Просмотр списка задач с опциональной фильтрацией по автору и пагинацией
+      description: Сначала невыполненные, по ближайшему сроку; без срока — в конце
       parameters:
-      - description: Фильтрация задач по ID автора
+      - description: Фильтрация задач по ID автора (только для администратора)
         in: query
         name: user_id
+        type: integer
+      - description: Задачи одного списка
+        in: query
+        name: list_id
         type: integer
       - description: Размер страницы с задачами (по умолчанию 50, максимум 500)
         in: query

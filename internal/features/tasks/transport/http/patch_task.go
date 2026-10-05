@@ -2,6 +2,7 @@ package tasks_transport_http
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/dadqeds/todoapp/internal/core/domain"
 	core_logger "github.com/dadqeds/todoapp/internal/core/logger"
@@ -14,7 +15,11 @@ type PatchTaskRequest struct {
 	Title       core_http_types.Nullable[string] `json:"title"       swaggertype:"string"  example:"Купить молоко"`
 	Description core_http_types.Nullable[string] `json:"description" swaggertype:"string"  example:"2 литра"`
 	Completed   core_http_types.Nullable[bool]   `json:"completed"   swaggertype:"boolean" example:"true"`
-	Version     *int                             `json:"version"     example:"3"`
+	ListID      core_http_types.Nullable[int]    `json:"list_id"     swaggertype:"integer" example:"3"`
+	// null снимает срок
+	DueAt     core_http_types.Nullable[time.Time] `json:"due_at"      swaggertype:"string"  example:"2026-10-06T10:00:00+03:00"`
+	DueAllDay core_http_types.Nullable[bool]      `json:"due_all_day" swaggertype:"boolean" example:"false"`
+	Version   *int                                `json:"version"     example:"3"`
 }
 
 type PatchTaskResponse TaskDTOResponse
@@ -82,10 +87,13 @@ func (h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter, r *http.Request) {
 }
 
 func taskPatchFromRequest(request PatchTaskRequest) domain.TaskPatch {
-	return domain.NewTaskPatch(
-		request.Title.ToDomain(),
-		request.Description.ToDomain(),
-		request.Completed.ToDomain(),
-		request.Version,
-	)
+	return domain.TaskPatch{
+		Title:           request.Title.ToDomain(),
+		Description:     request.Description.ToDomain(),
+		Completed:       request.Completed.ToDomain(),
+		ListID:          request.ListID.ToDomain(),
+		DueAt:           request.DueAt.ToDomain(),
+		DueAllDay:       request.DueAllDay.ToDomain(),
+		ExpectedVersion: request.Version,
+	}
 }

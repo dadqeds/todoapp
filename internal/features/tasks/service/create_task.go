@@ -23,6 +23,11 @@ func (s *TasksService) CreateTask(
 		task.AuthorUserID = actor.User.ID
 	}
 
+	task.ListID, err = s.resolveTaskList(ctx, task.ListID, task.AuthorUserID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+
 	if err := task.Validate(); err != nil {
 		return domain.Task{}, fmt.Errorf(
 			"validate task domain: %w",

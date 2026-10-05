@@ -10,7 +10,7 @@ import (
 
 func (s *TasksService) GetTasks(
 	ctx context.Context,
-	userID *int,
+	filter domain.TaskFilter,
 	limit *int,
 	offset *int,
 ) ([]domain.Task, error) {
@@ -21,7 +21,7 @@ func (s *TasksService) GetTasks(
 
 	// Обычный пользователь видит только свои задачи, фильтр user_id игнорируется.
 	if !actor.IsAdmin {
-		userID = &actor.User.ID
+		filter.AuthorUserID = &actor.User.ID
 	}
 
 	l, o, err := domain.NormalizePagination(limit, offset)
@@ -29,7 +29,7 @@ func (s *TasksService) GetTasks(
 		return nil, fmt.Errorf("normalize pagination: %w", err)
 	}
 
-	tasks, err := s.tasksRepository.GetTasks(ctx, userID, l, o)
+	tasks, err := s.tasksRepository.GetTasks(ctx, filter, l, o)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"get tasks from repository: %w",

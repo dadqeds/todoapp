@@ -43,17 +43,23 @@ func (s *StatisticsService) GetStatistics(
 	return calcStatistics(summary), nil
 }
 
-func calcStatistics(summary TasksSummary) domain.Statistics {
-	if summary.Created == 0 {
-		return domain.NewStatistics(0, 0, nil, nil)
+func percent(part, total int) *float64 {
+	if total == 0 {
+		return nil
 	}
+	rate := float64(part) / float64(total) * 100
+	return &rate
+}
 
-	completedRate := float64(summary.Completed) / float64(summary.Created) * 100
-
-	return domain.NewStatistics(
-		summary.Created,
-		summary.Completed,
-		&completedRate,
-		summary.AverageCompletionTime,
-	)
+func calcStatistics(summary TasksSummary) domain.Statistics {
+	return domain.Statistics{
+		TasksCreated:               summary.Created,
+		TasksCompleted:             summary.Completed,
+		TasksCompletedRate:         percent(summary.Completed, summary.Created),
+		TasksAverageCompletionTime: summary.AverageCompletionTime,
+		TasksCompletedWithDue:      summary.CompletedWithDue,
+		TasksCompletedOnTime:       summary.CompletedOnTime,
+		TasksOnTimeRate:            percent(summary.CompletedOnTime, summary.CompletedWithDue),
+		Lists:                      summary.Lists,
+	}
 }
