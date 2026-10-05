@@ -19,7 +19,11 @@ type PatchTaskRequest struct {
 	// null снимает срок
 	DueAt     core_http_types.Nullable[time.Time] `json:"due_at"      swaggertype:"string"  example:"2026-10-06T10:00:00+03:00"`
 	DueAllDay core_http_types.Nullable[bool]      `json:"due_all_day" swaggertype:"boolean" example:"false"`
-	Version   *int                                `json:"version"     example:"3"`
+	// null выключает повтор
+	Repeat core_http_types.Nullable[RepeatDTO] `json:"repeat"`
+	// null выключает напоминание
+	RemindBeforeMinutes core_http_types.Nullable[int] `json:"remind_before_minutes" swaggertype:"integer" example:"60"`
+	Version             *int                          `json:"version"     example:"3"`
 }
 
 type PatchTaskResponse TaskDTOResponse
@@ -33,6 +37,7 @@ type PatchTaskResponse TaskDTOResponse
 // @Description 	3. **Явно передан null**: '"description": null' - очищает поле в БД (set to NULL)
 // @Description 	Ограничения: 'title' и 'completed' не могут быть выставлены как null
 // @Description 	Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
+// @Description 	Выполнение повторяющейся задачи создаёт следующую с новым сроком, у выполненной повтор снимается
 // @Tags 			tasks
 // @Security 		TelegramInitData
 // @Accept 			json
@@ -88,12 +93,15 @@ func (h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter, r *http.Request) {
 
 func taskPatchFromRequest(request PatchTaskRequest) domain.TaskPatch {
 	return domain.TaskPatch{
-		Title:           request.Title.ToDomain(),
-		Description:     request.Description.ToDomain(),
-		Completed:       request.Completed.ToDomain(),
-		ListID:          request.ListID.ToDomain(),
-		DueAt:           request.DueAt.ToDomain(),
-		DueAllDay:       request.DueAllDay.ToDomain(),
-		ExpectedVersion: request.Version,
+		Title:       request.Title.ToDomain(),
+		Description: request.Description.ToDomain(),
+		Completed:   request.Completed.ToDomain(),
+		ListID:      request.ListID.ToDomain(),
+		DueAt:       request.DueAt.ToDomain(),
+		DueAllDay:   request.DueAllDay.ToDomain(),
+		Repeat:      domain.Nullable[domain.Recurrence]{Value: request.Repeat.Value.toDomain(), Set: request.Repeat.Set},
+
+		RemindBeforeMinutes: request.RemindBeforeMinutes.ToDomain(),
+		ExpectedVersion:     request.Version,
 	}
 }

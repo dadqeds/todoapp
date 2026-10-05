@@ -831,7 +831,7 @@ const docTemplate = `{
                         "TelegramInitData": []
                     }
                 ],
-                "description": "Обновляет информацию об уже существующей в системе задаче\n### Логика обновления полей (Three-state logic):\n1. **Поле не передано**: 'description' игнорируется, значение в БД не меняется\n2. **Явно передано значение**: '\"description\": \"Утром в 06:30 выйти на прогулку с Бобиком\"'\n3. **Явно передан null**: '\"description\": null' - очищает поле в БД (set to NULL)\nОграничения: 'title' и 'completed' не могут быть выставлены как null\nНеобязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409",
+                "description": "Обновляет информацию об уже существующей в системе задаче\n### Логика обновления полей (Three-state logic):\n1. **Поле не передано**: 'description' игнорируется, значение в БД не меняется\n2. **Явно передано значение**: '\"description\": \"Утром в 06:30 выйти на прогулку с Бобиком\"'\n3. **Явно передан null**: '\"description\": null' - очищает поле в БД (set to NULL)\nОграничения: 'title' и 'completed' не могут быть выставлены как null\nНеобязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409\nВыполнение повторяющейся задачи создаёт следующую с новым сроком, у выполненной повтор снимается",
                 "consumes": [
                     "application/json"
                 ],
@@ -1236,6 +1236,17 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-internal_features_tasks_transport_http_RepeatDTO": {
+            "type": "object",
+            "properties": {
+                "set": {
+                    "type": "boolean"
+                },
+                "value": {
+                    "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
+                }
+            }
+        },
         "internal_features_lists_transport_http.CreateListRequest": {
             "type": "object",
             "required": [
@@ -1540,6 +1551,19 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 3
                 },
+                "remind_before_minutes": {
+                    "description": "0 — в срок, 15, 60, 1440 — за день; требует срока.",
+                    "type": "integer",
+                    "example": 15
+                },
+                "repeat": {
+                    "description": "Повтор требует срока.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
+                        }
+                    ]
+                },
                 "title": {
                     "type": "string",
                     "maxLength": 100,
@@ -1577,6 +1601,14 @@ const docTemplate = `{
                 },
                 "list_id": {
                     "type": "integer"
+                },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
+                },
+                "repeat": {
+                    "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
                 },
                 "title": {
                     "type": "string"
@@ -1616,6 +1648,14 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer"
                 },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
+                },
+                "repeat": {
+                    "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
+                },
                 "title": {
                     "type": "string"
                 },
@@ -1647,6 +1687,19 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer",
                     "example": 3
+                },
+                "remind_before_minutes": {
+                    "description": "null выключает напоминание",
+                    "type": "integer",
+                    "example": 60
+                },
+                "repeat": {
+                    "description": "null выключает повтор",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-internal_features_tasks_transport_http_RepeatDTO"
+                        }
+                    ]
                 },
                 "title": {
                     "type": "string",
@@ -1688,11 +1741,44 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer"
                 },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
+                },
+                "repeat": {
+                    "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
+                },
                 "title": {
                     "type": "string"
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "internal_features_tasks_transport_http.RepeatDTO": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "daily",
+                        "weekly",
+                        "monthly",
+                        "yearly"
+                    ],
+                    "example": "weekly"
+                },
+                "weekdays": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "example": [
+                        1,
+                        4
+                    ]
                 }
             }
         },
@@ -1726,6 +1812,14 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer"
                 },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
+                },
+                "repeat": {
+                    "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
+                },
                 "title": {
                     "type": "string"
                 },
@@ -1757,6 +1851,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.CreateUserResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1769,9 +1871,17 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
                 "telegram_id": {
                     "type": "integer",
                     "example": 123456789
+                },
+                "timezone": {
+                    "type": "string",
+                    "example": "Europe/Moscow"
                 },
                 "version": {
                     "type": "integer",
@@ -1782,6 +1892,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.GetMeResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1798,9 +1916,17 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
                 "telegram_id": {
                     "type": "integer",
                     "example": 123456789
+                },
+                "timezone": {
+                    "type": "string",
+                    "example": "Europe/Moscow"
                 },
                 "version": {
                     "type": "integer",
@@ -1811,6 +1937,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.GetUserResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1823,9 +1957,17 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
                 "telegram_id": {
                     "type": "integer",
                     "example": 123456789
+                },
+                "timezone": {
+                    "type": "string",
+                    "example": "Europe/Moscow"
                 },
                 "version": {
                     "type": "integer",
@@ -1836,6 +1978,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.PatchUserRequest": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Максим Максимович"
@@ -1843,6 +1993,14 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+71112223344"
+                },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "timezone": {
+                    "type": "string",
+                    "example": "Europe/Moscow"
                 },
                 "version": {
                     "type": "integer",
@@ -1853,6 +2011,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.PatchUserResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1865,9 +2031,17 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
                 "telegram_id": {
                     "type": "integer",
                     "example": 123456789
+                },
+                "timezone": {
+                    "type": "string",
+                    "example": "Europe/Moscow"
                 },
                 "version": {
                     "type": "integer",
@@ -1878,6 +2052,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.UserDTOResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1890,9 +2072,17 @@ const docTemplate = `{
                     "type": "string",
                     "example": "+79998887766"
                 },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
                 "telegram_id": {
                     "type": "integer",
                     "example": 123456789
+                },
+                "timezone": {
+                    "type": "string",
+                    "example": "Europe/Moscow"
                 },
                 "version": {
                     "type": "integer",

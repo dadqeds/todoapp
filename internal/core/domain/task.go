@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	core_errors "github.com/dadqeds/todoapp/internal/core/errors"
@@ -24,7 +25,18 @@ type Task struct {
 	// и показывать нужно только дату.
 	DueAt     *time.Time
 	DueAllDay bool
+
+	// Repeat — правило повтора; требует срока.
+	Repeat *Recurrence
+
+	// RemindBeforeMinutes — за сколько минут до срока напомнить (0 — в срок).
+	// RemindedAt — когда напоминание отправлено; сбрасывается при смене срока.
+	RemindBeforeMinutes *int
+	RemindedAt          *time.Time
 }
+
+// RemindOptions — допустимые значения напоминания: в срок, за 15 минут, за час, за день.
+var RemindOptions = []int{0, 15, 60, 1440}
 
 func NewTask(
 	id int,
@@ -125,6 +137,34 @@ func (t *Task) Validate() error {
 		)
 	}
 
+	if t.RemindBeforeMinutes != nil {
+		if t.DueAt == nil {
+			return fmt.Errorf(
+				"`RemindBeforeMinutes` requires `DueAt`: %w",
+				core_errors.ErrInvalidArgument,
+			)
+		}
+		if !slices.Contains(RemindOptions, *t.RemindBeforeMinutes) {
+			return fmt.Errorf(
+				"invalid `RemindBeforeMinutes` %d: %w",
+				*t.RemindBeforeMinutes,
+				core_errors.ErrInvalidArgument,
+			)
+		}
+	}
+
+	if t.Repeat != nil {
+		if t.DueAt == nil {
+			return fmt.Errorf(
+				"`Repeat` requires `DueAt`: %w",
+				core_errors.ErrInvalidArgument,
+			)
+		}
+		if err := t.Repeat.Validate(); err != nil {
+			return fmt.Errorf("validate repeat: %w", err)
+		}
+	}
+
 	if t.Completed {
 		if t.CompletedAt == nil {
 			return fmt.Errorf(
@@ -160,6 +200,12 @@ type TaskPatch struct {
 	// DueAt=null снимает срок (и DueAllDay вместе с ним).
 	DueAt     Nullable[time.Time]
 	DueAllDay Nullable[bool]
+
+	// Repeat=null выключает повтор. Снятие срока выключает повтор тоже.
+	Repeat Nullable[Recurrence]
+
+	// RemindBeforeMinutes=null выключает напоминание.
+	RemindBeforeMinutes Nullable[int]
 
 	// ExpectedVersion — версия, которую видел клиент. Если задана и не совпадает
 	// с текущей, патч отклоняется с ErrConflict (оптимистичная блокировка).
@@ -225,11 +271,26 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 		tmp.DueAt = patch.DueAt.Value
 		if tmp.DueAt == nil {
 			tmp.DueAllDay = false
+			tmp.Repeat = nil
+			tmp.RemindBeforeMinutes = nil
 		}
 	}
 
 	if patch.DueAllDay.Set {
 		tmp.DueAllDay = *patch.DueAllDay.Value
+	}
+
+	if patch.Repeat.Set {
+		tmp.Repeat = patch.Repeat.Value
+	}
+
+	if patch.RemindBeforeMinutes.Set {
+		tmp.RemindBeforeMinutes = patch.RemindBeforeMinutes.Value
+	}
+
+	// Новый срок или другое напоминание — напомнить нужно заново.
+	if patch.DueAt.Set || patch.DueAllDay.Set || patch.RemindBeforeMinutes.Set {
+		tmp.RemindedAt = nil
 	}
 
 	if patch.Completed.Set {
@@ -260,4 +321,42 @@ type TaskFilter struct {
 	ListID       *int
 	// AccessibleToUserID — задачи из списков, которыми пользователь владеет или в которых участвует.
 	AccessibleToUserID *int
+}
+
+// NextOccurrence возвращает следующий экземпляр повторяющейся задачи: та же
+// задача с новым сроком, ещё не выполненная. ok=false, если повтора нет.
+func (t *Task) NextOccurrence(now time.Time, loc *time.Location) (next Task, ok bool) {
+	if t.Repeat == nil || t.DueAt == nil {
+		return Task{}, false
+	}
+
+	due := t.Repeat.Next(*t.DueAt, now, loc)
+	repeat := *t.Repeat
+
+	next = NewTaskUninitialized(t.Title, t.Description, t.AuthorUserID, t.ListID, &due, t.DueAllDay)
+	next.Repeat = &repeat
+	if t.RemindBeforeMinutes != nil {
+		remind := *t.RemindBeforeMinutes
+		next.RemindBeforeMinutes = &remind
+	}
+	return next, true
+}
+
+// ReminderAt — когда напомнить о задаче. Для задачи на весь день отсчёт идёт
+// от времени утренней сводки в день срока (digestMinute — минуты от полуночи
+// по местному времени), иначе — от самого срока.
+func (t *Task) ReminderAt(loc *time.Location, digestMinute int) (time.Time, bool) {
+	if t.RemindBeforeMinutes == nil || t.DueAt == nil {
+		return time.Time{}, false
+	}
+
+	before := time.Duration(*t.RemindBeforeMinutes) * time.Minute
+
+	if !t.DueAllDay {
+		return t.DueAt.Add(-before), true
+	}
+
+	local := t.DueAt.In(loc)
+	morning := time.Date(local.Year(), local.Month(), local.Day(), digestMinute/60, digestMinute%60, 0, 0, loc)
+	return morning.Add(-before), true
 }

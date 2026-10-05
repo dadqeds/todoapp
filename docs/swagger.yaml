@@ -9,6 +9,13 @@ definitions:
         example: short human-readable message
         type: string
     type: object
+  github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-internal_features_tasks_transport_http_RepeatDTO:
+    properties:
+      set:
+        type: boolean
+      value:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
+    type: object
   internal_features_lists_transport_http.CreateListRequest:
     properties:
       color:
@@ -238,6 +245,14 @@ definitions:
         example: 3
         minimum: 1
         type: integer
+      remind_before_minutes:
+        description: 0 — в срок, 15, 60, 1440 — за день; требует срока.
+        example: 15
+        type: integer
+      repeat:
+        allOf:
+        - $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
+        description: Повтор требует срока.
       title:
         example: Купить молоко
         maxLength: 100
@@ -266,6 +281,13 @@ definitions:
         type: integer
       list_id:
         type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
+        type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
@@ -291,6 +313,13 @@ definitions:
         type: integer
       list_id:
         type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
+        type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
@@ -314,6 +343,14 @@ definitions:
       list_id:
         example: 3
         type: integer
+      remind_before_minutes:
+        description: null выключает напоминание
+        example: 60
+        type: integer
+      repeat:
+        allOf:
+        - $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_types.Nullable-internal_features_tasks_transport_http_RepeatDTO'
+        description: null выключает повтор
       title:
         example: Купить молоко
         type: string
@@ -341,10 +378,35 @@ definitions:
         type: integer
       list_id:
         type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
+        type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
         type: integer
+    type: object
+  internal_features_tasks_transport_http.RepeatDTO:
+    properties:
+      kind:
+        enum:
+        - daily
+        - weekly
+        - monthly
+        - yearly
+        example: weekly
+        type: string
+      weekdays:
+        example:
+        - 1
+        - 4
+        items:
+          type: integer
+        type: array
     type: object
   internal_features_tasks_transport_http.TaskDTOResponse:
     properties:
@@ -366,6 +428,13 @@ definitions:
         type: integer
       list_id:
         type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
+        type: integer
+      repeat:
+        $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
         type: string
       version:
@@ -388,6 +457,12 @@ definitions:
     type: object
   internal_features_users_transport_http.CreateUserResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -397,15 +472,27 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
     type: object
   internal_features_users_transport_http.GetMeResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -418,15 +505,27 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
     type: object
   internal_features_users_transport_http.GetUserResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -436,20 +535,38 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
     type: object
   internal_features_users_transport_http.PatchUserRequest:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Максим Максимович
         type: string
       phone_number:
         example: "+71112223344"
+        type: string
+      remind_enabled:
+        example: true
+        type: boolean
+      timezone:
+        example: Europe/Moscow
         type: string
       version:
         example: 3
@@ -457,6 +574,12 @@ definitions:
     type: object
   internal_features_users_transport_http.PatchUserResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -466,15 +589,27 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
     type: object
   internal_features_users_transport_http.UserDTOResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -484,9 +619,15 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
+      timezone:
+        example: Europe/Moscow
+        type: string
       version:
         example: 3
         type: integer
@@ -1037,6 +1178,7 @@ paths:
         3. **Явно передан null**: '"description": null' - очищает поле в БД (set to NULL)
         Ограничения: 'title' и 'completed' не могут быть выставлены как null
         Необязательное поле 'version' — версия, которую видел клиент; при расхождении с текущей вернётся 409
+        Выполнение повторяющейся задачи создаёт следующую с новым сроком, у выполненной повтор снимается
       parameters:
       - description: ID изменяемой задачи
         in: path

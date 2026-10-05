@@ -18,8 +18,8 @@ func (r *TasksRepository) CreateTask(
 	defer cancel()
 
 	query := `
-	INSERT INTO todoapp.tasks (title, description, completed, created_at, completed_at, author_user_id, list_id, due_at, due_all_day)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	INSERT INTO todoapp.tasks (title, description, completed, created_at, completed_at, author_user_id, list_id, due_at, due_all_day, repeat_rule, remind_before_minutes)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	RETURNING ` + taskColumns + `;
 	`
 
@@ -35,6 +35,8 @@ func (r *TasksRepository) CreateTask(
 		task.ListID,
 		task.DueAt,
 		task.DueAllDay,
+		repeatRuleToModel(task.Repeat),
+		task.RemindBeforeMinutes,
 	)
 
 	taskModel, err := scanTaskModel(row)
