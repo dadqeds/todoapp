@@ -245,6 +245,10 @@ definitions:
         example: 3
         minimum: 1
         type: integer
+      remind_before_minutes:
+        description: 0 — в срок, 15, 60, 1440 — за день; требует срока.
+        example: 15
+        type: integer
       repeat:
         allOf:
         - $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
@@ -277,6 +281,11 @@ definitions:
         type: integer
       list_id:
         type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
+        type: integer
       repeat:
         $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
@@ -304,6 +313,11 @@ definitions:
         type: integer
       list_id:
         type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
+        type: integer
       repeat:
         $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
@@ -328,6 +342,10 @@ definitions:
         type: string
       list_id:
         example: 3
+        type: integer
+      remind_before_minutes:
+        description: null выключает напоминание
+        example: 60
         type: integer
       repeat:
         allOf:
@@ -359,6 +377,11 @@ definitions:
       id:
         type: integer
       list_id:
+        type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
         type: integer
       repeat:
         $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
@@ -405,6 +428,11 @@ definitions:
         type: integer
       list_id:
         type: integer
+      remind_before_minutes:
+        description: 'За сколько минут до срока напомнить: 0, 15, 60, 1440; null —
+          без напоминания.'
+        example: 15
+        type: integer
       repeat:
         $ref: '#/definitions/internal_features_tasks_transport_http.RepeatDTO'
       title:
@@ -429,6 +457,12 @@ definitions:
     type: object
   internal_features_users_transport_http.CreateUserResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -438,6 +472,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
@@ -450,6 +487,12 @@ definitions:
     type: object
   internal_features_users_transport_http.GetMeResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -462,6 +505,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
@@ -474,6 +520,12 @@ definitions:
     type: object
   internal_features_users_transport_http.GetUserResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -483,6 +535,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
@@ -495,12 +550,21 @@ definitions:
     type: object
   internal_features_users_transport_http.PatchUserRequest:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Максим Максимович
         type: string
       phone_number:
         example: "+71112223344"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       timezone:
         example: Europe/Moscow
         type: string
@@ -510,6 +574,12 @@ definitions:
     type: object
   internal_features_users_transport_http.PatchUserResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -519,6 +589,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer
@@ -531,6 +604,12 @@ definitions:
     type: object
   internal_features_users_transport_http.UserDTOResponse:
     properties:
+      digest_enabled:
+        example: true
+        type: boolean
+      digest_time:
+        example: "08:30"
+        type: string
       full_name:
         example: Ivan Ivanov
         type: string
@@ -540,6 +619,9 @@ definitions:
       phone_number:
         example: "+79998887766"
         type: string
+      remind_enabled:
+        example: true
+        type: boolean
       telegram_id:
         example: 123456789
         type: integer

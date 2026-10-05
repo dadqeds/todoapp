@@ -22,6 +22,8 @@ type CreateTaskRequest struct {
 	DueAllDay bool       `json:"due_all_day" example:"false"`
 	// Повтор требует срока.
 	Repeat *RepeatDTO `json:"repeat"`
+	// 0 — в срок, 15, 60, 1440 — за день; требует срока.
+	RemindBeforeMinutes *int `json:"remind_before_minutes" example:"15"`
 }
 
 type CreateTaskResponse TaskDTOResponse
@@ -65,6 +67,7 @@ func (h *TasksHTTPHandler) CreateTask(rw http.ResponseWriter, r *http.Request) {
 	)
 
 	taskDomain.Repeat = request.Repeat.toDomain()
+	taskDomain.RemindBeforeMinutes = request.RemindBeforeMinutes
 
 	taskDomain, err := h.tasksService.CreateTask(ctx, taskDomain)
 	if err != nil {

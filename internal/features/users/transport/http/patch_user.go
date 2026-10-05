@@ -14,7 +14,11 @@ type PatchUserRequest struct {
 	FullName    core_http_types.Nullable[string] `json:"full_name"       swaggertype:"string" example:"Максим Максимович"`
 	PhoneNumber core_http_types.Nullable[string] `json:"phone_number"    swaggertype:"string" example:"+71112223344"`
 	Timezone    core_http_types.Nullable[string] `json:"timezone"        swaggertype:"string" example:"Europe/Moscow"`
-	Version     *int                             `json:"version"         example:"3"`
+
+	RemindEnabled core_http_types.Nullable[bool]   `json:"remind_enabled" swaggertype:"boolean" example:"true"`
+	DigestEnabled core_http_types.Nullable[bool]   `json:"digest_enabled" swaggertype:"boolean" example:"true"`
+	DigestTime    core_http_types.Nullable[string] `json:"digest_time"    swaggertype:"string"  example:"08:30"`
+	Version       *int                             `json:"version"         example:"3"`
 }
 
 type PatchUserResponse UserDTOResponse
@@ -59,7 +63,11 @@ func (h *UsersHTTPHandler) PatchUser(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userPatch := userPatchFromRequest(request)
+	userPatch, err := userPatchFromRequest(request)
+	if err != nil {
+		responseHandler.ErrorResponse(err, "failed to parse user patch")
+		return
+	}
 
 	userDomain, err := h.usersService.PatchUser(ctx, userID, userPatch)
 	if err != nil {
@@ -75,11 +83,26 @@ func (h *UsersHTTPHandler) PatchUser(rw http.ResponseWriter, r *http.Request) {
 	responseHandler.JSONResponse(response, http.StatusOK)
 }
 
-func userPatchFromRequest(request PatchUserRequest) domain.UserPatch {
-	return domain.UserPatch{
+func userPatchFromRequest(request PatchUserRequest) (domain.UserPatch, error) {
+	patch := domain.UserPatch{
 		Fullname:        request.FullName.ToDomain(),
 		PhoneNumber:     request.PhoneNumber.ToDomain(),
 		Timezone:        request.Timezone.ToDomain(),
+		RemindEnabled:   request.RemindEnabled.ToDomain(),
+		DigestEnabled:   request.DigestEnabled.ToDomain(),
 		ExpectedVersion: request.Version,
 	}
+
+	if request.DigestTime.Set {
+		patch.DigestMinute.Set = true
+		if request.DigestTime.Value != nil {
+			minute, err := parseDigestTime(*request.DigestTime.Value)
+			if err != nil {
+				return domain.UserPatch{}, err
+			}
+			patch.DigestMinute.Value = &minute
+		}
+	}
+
+	return patch, nil
 }

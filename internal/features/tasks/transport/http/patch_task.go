@@ -20,8 +20,10 @@ type PatchTaskRequest struct {
 	DueAt     core_http_types.Nullable[time.Time] `json:"due_at"      swaggertype:"string"  example:"2026-10-06T10:00:00+03:00"`
 	DueAllDay core_http_types.Nullable[bool]      `json:"due_all_day" swaggertype:"boolean" example:"false"`
 	// null выключает повтор
-	Repeat  core_http_types.Nullable[RepeatDTO] `json:"repeat"`
-	Version *int                                `json:"version"     example:"3"`
+	Repeat core_http_types.Nullable[RepeatDTO] `json:"repeat"`
+	// null выключает напоминание
+	RemindBeforeMinutes core_http_types.Nullable[int] `json:"remind_before_minutes" swaggertype:"integer" example:"60"`
+	Version             *int                          `json:"version"     example:"3"`
 }
 
 type PatchTaskResponse TaskDTOResponse
@@ -91,13 +93,15 @@ func (h *TasksHTTPHandler) PatchTask(rw http.ResponseWriter, r *http.Request) {
 
 func taskPatchFromRequest(request PatchTaskRequest) domain.TaskPatch {
 	return domain.TaskPatch{
-		Title:           request.Title.ToDomain(),
-		Description:     request.Description.ToDomain(),
-		Completed:       request.Completed.ToDomain(),
-		ListID:          request.ListID.ToDomain(),
-		DueAt:           request.DueAt.ToDomain(),
-		DueAllDay:       request.DueAllDay.ToDomain(),
-		Repeat:          domain.Nullable[domain.Recurrence]{Value: request.Repeat.Value.toDomain(), Set: request.Repeat.Set},
-		ExpectedVersion: request.Version,
+		Title:       request.Title.ToDomain(),
+		Description: request.Description.ToDomain(),
+		Completed:   request.Completed.ToDomain(),
+		ListID:      request.ListID.ToDomain(),
+		DueAt:       request.DueAt.ToDomain(),
+		DueAllDay:   request.DueAllDay.ToDomain(),
+		Repeat:      domain.Nullable[domain.Recurrence]{Value: request.Repeat.Value.toDomain(), Set: request.Repeat.Set},
+
+		RemindBeforeMinutes: request.RemindBeforeMinutes.ToDomain(),
+		ExpectedVersion:     request.Version,
 	}
 }

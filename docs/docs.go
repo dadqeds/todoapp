@@ -1551,6 +1551,11 @@ const docTemplate = `{
                     "minimum": 1,
                     "example": 3
                 },
+                "remind_before_minutes": {
+                    "description": "0 — в срок, 15, 60, 1440 — за день; требует срока.",
+                    "type": "integer",
+                    "example": 15
+                },
                 "repeat": {
                     "description": "Повтор требует срока.",
                     "allOf": [
@@ -1597,6 +1602,11 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer"
                 },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
+                },
                 "repeat": {
                     "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
                 },
@@ -1638,6 +1648,11 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer"
                 },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
+                },
                 "repeat": {
                     "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
                 },
@@ -1672,6 +1687,11 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer",
                     "example": 3
+                },
+                "remind_before_minutes": {
+                    "description": "null выключает напоминание",
+                    "type": "integer",
+                    "example": 60
                 },
                 "repeat": {
                     "description": "null выключает повтор",
@@ -1720,6 +1740,11 @@ const docTemplate = `{
                 },
                 "list_id": {
                     "type": "integer"
+                },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
                 },
                 "repeat": {
                     "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
@@ -1787,6 +1812,11 @@ const docTemplate = `{
                 "list_id": {
                     "type": "integer"
                 },
+                "remind_before_minutes": {
+                    "description": "За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.",
+                    "type": "integer",
+                    "example": 15
+                },
                 "repeat": {
                     "$ref": "#/definitions/internal_features_tasks_transport_http.RepeatDTO"
                 },
@@ -1821,6 +1851,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.CreateUserResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1832,6 +1870,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+79998887766"
+                },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "telegram_id": {
                     "type": "integer",
@@ -1850,6 +1892,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.GetMeResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1865,6 +1915,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+79998887766"
+                },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "telegram_id": {
                     "type": "integer",
@@ -1883,6 +1937,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.GetUserResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1894,6 +1956,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+79998887766"
+                },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "telegram_id": {
                     "type": "integer",
@@ -1912,6 +1978,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.PatchUserRequest": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Максим Максимович"
@@ -1919,6 +1993,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+71112223344"
+                },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "timezone": {
                     "type": "string",
@@ -1933,6 +2011,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.PatchUserResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1944,6 +2030,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+79998887766"
+                },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "telegram_id": {
                     "type": "integer",
@@ -1962,6 +2052,14 @@ const docTemplate = `{
         "internal_features_users_transport_http.UserDTOResponse": {
             "type": "object",
             "properties": {
+                "digest_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "digest_time": {
+                    "type": "string",
+                    "example": "08:30"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Ivan Ivanov"
@@ -1973,6 +2071,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "+79998887766"
+                },
+                "remind_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "telegram_id": {
                     "type": "integer",

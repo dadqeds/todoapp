@@ -15,11 +15,14 @@ import (
 	core_auth "github.com/dadqeds/todoapp/internal/core/auth"
 	core_logger "github.com/dadqeds/todoapp/internal/core/logger"
 	core_pgx_pool "github.com/dadqeds/todoapp/internal/core/repository/postgres/pool/pgx"
+	core_telegram "github.com/dadqeds/todoapp/internal/core/telegram"
 	core_http_middleware "github.com/dadqeds/todoapp/internal/core/transport/http/middleware"
 	core_http_server "github.com/dadqeds/todoapp/internal/core/transport/http/server"
 	lists_postgres_repository "github.com/dadqeds/todoapp/internal/features/lists/repository/postgres"
 	lists_service "github.com/dadqeds/todoapp/internal/features/lists/service"
 	lists_transport_http "github.com/dadqeds/todoapp/internal/features/lists/transport/http"
+	notifications_postgres_repository "github.com/dadqeds/todoapp/internal/features/notifications/repository/postgres"
+	notifications_service "github.com/dadqeds/todoapp/internal/features/notifications/service"
 	statistics_postgres_repository "github.com/dadqeds/todoapp/internal/features/statistics/repository/postgres"
 	statistics_service "github.com/dadqeds/todoapp/internal/features/statistics/service"
 	statistics_transport_http "github.com/dadqeds/todoapp/internal/features/statistics/transport/http"
@@ -166,6 +169,17 @@ func run() error {
 		localConfig.SwaggerEnabled = true
 
 		servers = append(servers, newServer(localConfig, core_http_middleware.LocalAuth(authConfig.LocalTelegramID, usersService)))
+	}
+
+	// Напоминания и утренняя сводка: без токена бота писать некому.
+	if authConfig.TelegramBotToken != "" {
+		notifier := notifications_service.NewNotifier(
+			notifications_postgres_repository.NewNotificationsRepository(pool),
+			core_telegram.NewClient(authConfig.TelegramAPIURL, authConfig.TelegramBotToken),
+			authConfig.TelegramBotUsername,
+			logger.With(zap.String("component", "notifier")),
+		)
+		go notifier.Run(ctx)
 	}
 
 	if err := runServers(ctx, servers); err != nil {

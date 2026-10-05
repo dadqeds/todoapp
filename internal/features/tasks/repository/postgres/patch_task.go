@@ -29,8 +29,18 @@ func (r *TasksRepository) PatchTask(
 		due_at=$6,
 		due_all_day=$7,
 		repeat_rule=$8,
+		remind_before_minutes=$9,
+		-- Отметку об отправке сбрасываем только при реальной смене срока или
+		-- напоминания: так запрос с устаревшими данными не вызовет повторное напоминание.
+		reminded_at=CASE
+			WHEN due_at IS DISTINCT FROM $6
+				OR due_all_day IS DISTINCT FROM $7
+				OR remind_before_minutes IS DISTINCT FROM $9
+			THEN NULL
+			ELSE reminded_at
+		END,
 		version=version + 1
-	WHERE id=$9 AND version=$10 
+	WHERE id=$10 AND version=$11 
 
 	RETURNING ` + taskColumns + `;
 	`
@@ -46,6 +56,7 @@ func (r *TasksRepository) PatchTask(
 		task.DueAt,
 		task.DueAllDay,
 		repeatRuleToModel(task.Repeat),
+		task.RemindBeforeMinutes,
 		id,
 		task.Version,
 	)

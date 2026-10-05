@@ -44,6 +44,7 @@ const ICONS = {
   chev: '<path d="M9 6l6 6-6 6"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+  bell: '<path d="M6 16V11a6 6 0 0112 0v5l2 2H4l2-2z"/><path d="M10 20a2 2 0 004 0"/>',
   repeat: '<path d="M4 11V9a3 3 0 013-3h12M16 3l3 3-3 3"/><path d="M20 13v2a3 3 0 01-3 3H5M8 21l-3-3 3-3"/>',
   share: '<path d="M12 4v11M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
@@ -91,6 +92,13 @@ function dueTag(task) {
   return `<span class="tag">${esc(text)}</span>`;
 }
 
+const REMIND_OPTIONS = [
+  ["none", "Нет"],
+  ["0", "В срок"],
+  ["15", "За 15 мин"],
+  ["60", "За час"],
+  ["1440", "За день"],
+];
 const WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 const isoWeekday = d => ((d.getDay() + 6) % 7) + 1;
 
@@ -303,6 +311,10 @@ function taskCard(t) {
       ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
       <div class="task-meta">${dueTag(t)}${
         t.repeat && !t.completed ? `<span class="tag">${icon("repeat", 12)} ${esc(repeatText(t.repeat))}</span>` : ""
+      }${
+        t.remind_before_minutes != null && !t.completed
+          ? `<span class="tag" title="Напоминание">${icon("bell", 12)}</span>`
+          : ""
       }${
         isShared(list) && t.author_user_id !== state.me.id
           ? `<span class="tag">${esc(memberName(list, t.author_user_id) || "участник")}</span>`
@@ -519,6 +531,19 @@ function openTaskSheet(task = null) {
               task?.repeat?.weekdays?.includes(i + 1),
             )}">${d}</button>`,
         ).join("")}</div>
+
+        <span class="field-label">Напомнить</span>
+        <div class="chips wrap">${REMIND_OPTIONS.map(
+          ([v, label]) =>
+            `<button class="chip" type="button" data-remind="" data-value="${v}" aria-pressed="${
+              String(task?.remind_before_minutes ?? "none") === v
+            }" ${v === "15" || v === "60" ? 'data-timed=""' : ""}>${label}</button>`,
+        ).join("")}</div>
+        ${
+          state.me.remind_enabled
+            ? ""
+            : '<p class="hint">Напоминания выключены — включите их в профиле, чтобы бот писал.</p>'
+        }
       </div>
 
       <span class="field-label">Список</span>
@@ -558,6 +583,26 @@ function openTaskSheet(task = null) {
       document.querySelector(`[data-weekday="${day}"]`).setAttribute("aria-pressed", "true");
     }
   });
+  // Для задачи на весь день «за 15 минут» и «за час» смысла не имеют.
+  let remindTouched = Boolean(task);
+  bindChoice("[data-remind]", () => (remindTouched = true));
+  const syncRemindOptions = () => {
+    const timed = Boolean($("#taskTime").value);
+    document.querySelectorAll("[data-remind][data-timed]").forEach(b => {
+      b.hidden = !timed;
+      if (!timed && b.getAttribute("aria-pressed") === "true") {
+        b.setAttribute("aria-pressed", "false");
+        document.querySelector('[data-remind][data-value="0"]').setAttribute("aria-pressed", "true");
+      }
+    });
+    // Новой задаче со временем по умолчанию ставим напоминание «в срок».
+    if (!remindTouched) {
+      const value = timed ? "0" : "none";
+      document.querySelectorAll("[data-remind]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.value === value)));
+    }
+  };
+  $("#taskTime").addEventListener("input", syncRemindOptions);
+  syncRemindOptions();
   document.querySelectorAll("[data-weekday]").forEach(b => {
     b.onclick = () => {
       b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
@@ -572,6 +617,12 @@ function openTaskSheet(task = null) {
     };
     $("#taskDelete").onclick = () => deleteTask(task);
   }
+}
+
+function readRemind() {
+  const v = chosen("[data-remind]");
+  if (!v || v === "none" || chosen("[data-due]") === "none") return null;
+  return Number(v);
 }
 
 function readRepeat() {
@@ -609,6 +660,7 @@ async function saveTask(task) {
   }
   const due = readDue();
   const repeat = readRepeat();
+  const remind = readRemind();
   if (repeat?.kind === "weekly" && !repeat.weekdays.length) {
     toast("Выберите хотя бы один день недели.", true);
     return;
@@ -628,12 +680,13 @@ async function saveTask(task) {
         if (!same) Object.assign(body, due);
       }
       if (!sameRepeat(repeat, task.repeat)) body.repeat = repeat;
+      if (remind !== (task.remind_before_minutes ?? null)) body.remind_before_minutes = remind;
       if (!Object.keys(body).length) return closeSheet(true);
       body.version = task.version;
       await api(`/tasks/${task.id}`, send("PATCH", body));
       toast("Задача сохранена");
     } else {
-      await api("/tasks", send("POST", { title, description: description || undefined, list_id: listId, ...due, repeat }), {
+      await api("/tasks", send("POST", { title, description: description || undefined, list_id: listId, ...due, repeat, remind_before_minutes: remind }), {
         404: "Список не найден — возможно, его удалили.",
       });
       haptic("success");
@@ -974,6 +1027,17 @@ async function renderProfile() {
       <button class="icon-btn" type="button" id="editProfile" aria-label="Изменить профиль">${icon("edit")}</button>
     </div>
 
+    <div class="section-label">Уведомления</div>
+    <div class="rows">
+      <div class="row"><span class="row-main">Напоминания о сроках<div class="row-sub">когда указано у задачи</div></span>
+        <button class="switch" type="button" role="switch" id="remindSwitch" aria-checked="${Boolean(me.remind_enabled)}" aria-label="Напоминания о сроках"></button></div>
+      <div class="row"><span class="row-main">Утренняя сводка<div class="row-sub">что на сегодня и что просрочено</div></span>
+        <button class="switch" type="button" role="switch" id="digestSwitch" aria-checked="${Boolean(me.digest_enabled)}" aria-label="Утренняя сводка"></button></div>
+      <label class="row" for="digestTime"><span class="row-main">Время сводки<div class="row-sub">и напоминаний по задачам на весь день</div></span>
+        <input class="field" type="time" id="digestTime" value="${esc(me.digest_time || "09:00")}" style="width:auto;padding:6px 10px" /></label>
+      <div class="row"><span class="row-main">Часовой пояс</span><span class="row-sub">${esc(tzName(me.timezone))}</span></div>
+    </div>
+
     <div class="section-label">Мои списки</div>
     <div class="rows">${state.lists
       .map(
@@ -1011,6 +1075,9 @@ async function renderProfile() {
     }`;
 
   $("#editProfile").onclick = () => openUserSheet(me, { self: true });
+  $("#remindSwitch").onclick = () => toggleNotification("remind_enabled", "#remindSwitch");
+  $("#digestSwitch").onclick = () => toggleNotification("digest_enabled", "#digestSwitch");
+  $("#digestTime").onchange = e => e.target.value && saveSettings({ digest_time: e.target.value }, "Время сводки сохранено");
   document.querySelectorAll("[data-edit-list]").forEach(b => {
     b.onclick = () => openListSheet(listById(Number(b.dataset.editList)));
   });
@@ -1025,6 +1092,66 @@ async function renderProfile() {
       $("#themeSwitch").setAttribute("aria-checked", String(on));
     };
   if (isAdmin()) $("#usersRow").onclick = () => switchTab("users");
+}
+
+// ---------- Уведомления ----------
+const TZ_CITIES = {
+  "Europe/Kaliningrad": "Калининград",
+  "Europe/Moscow": "Москва",
+  "Europe/Samara": "Самара",
+  "Europe/Volgograd": "Волгоград",
+  "Asia/Yekaterinburg": "Екатеринбург",
+  "Asia/Omsk": "Омск",
+  "Asia/Novosibirsk": "Новосибирск",
+  "Asia/Krasnoyarsk": "Красноярск",
+  "Asia/Irkutsk": "Иркутск",
+  "Asia/Yakutsk": "Якутск",
+  "Asia/Vladivostok": "Владивосток",
+  "Asia/Magadan": "Магадан",
+  "Asia/Kamchatka": "Камчатка",
+};
+
+function tzName(tz) {
+  if (!tz || tz === "UTC") return "UTC";
+  const city = TZ_CITIES[tz] || tz.split("/").pop().replace(/_/g, " ");
+  try {
+    const offset = new Intl.DateTimeFormat("ru-RU", { timeZone: tz, timeZoneName: "shortOffset" })
+      .formatToParts(new Date())
+      .find(p => p.type === "timeZoneName")?.value;
+    return offset ? `${city}, ${offset.replace("GMT", "UTC")}` : city;
+  } catch {
+    return city;
+  }
+}
+
+// Бот может писать человеку, только если тот разрешил. Спрашиваем при включении.
+function requestWriteAccess() {
+  if (!inTelegram || !tg.requestWriteAccess || !tg.isVersionAtLeast?.("6.9")) return Promise.resolve(true);
+  return new Promise(resolve => tg.requestWriteAccess(granted => resolve(Boolean(granted))));
+}
+
+async function toggleNotification(field, switchSel) {
+  const on = !state.me[field];
+  if (on && !(await requestWriteAccess())) {
+    toast("Без разрешения бот не сможет присылать сообщения.", true);
+    return;
+  }
+  $(switchSel).setAttribute("aria-checked", String(on));
+  const ok = await saveSettings({ [field]: on }, on ? "Включено" : "Выключено");
+  if (!ok) $(switchSel).setAttribute("aria-checked", String(!on));
+}
+
+async function saveSettings(body, message) {
+  try {
+    const updated = await api(`/users/${state.me.id}`, send("PATCH", { ...body, version: state.me.version }));
+    state.me = { ...state.me, ...updated };
+    toast(message);
+    return true;
+  } catch (err) {
+    toast(err.message, true);
+    if (err.status === 409) await refreshMe();
+    return false;
+  }
 }
 
 // ---------- Пользователь (свой профиль и админка) ----------
@@ -1191,7 +1318,20 @@ async function start() {
   $("#tabbar").hidden = false;
   await syncTimezone();
   await joinFromLink();
-  switchTab("tasks");
+  await switchTab("tasks");
+  await openTaskFromLink();
+}
+
+// Кнопка «Открыть задачу» в напоминании ведёт на t.me/<бот>?startapp=task_<id>.
+async function openTaskFromLink() {
+  const param = (inTelegram ? tg.initDataUnsafe?.start_param : null) || "";
+  const id = param.startsWith("task_") ? Number(param.slice(5)) : Number(new URLSearchParams(location.search).get("task"));
+  if (!id) return;
+  try {
+    openTaskSheet(state.tasks.find(t => t.id === id) || (await api(`/tasks/${id}`)));
+  } catch (err) {
+    toast(err.status === 404 ? "Задача не найдена — возможно, её удалили." : err.message, true);
+  }
 }
 
 // Часовой пояс телефона нужен серверу для повторов и времени уведомлений.

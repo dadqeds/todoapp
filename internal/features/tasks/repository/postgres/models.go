@@ -6,7 +6,7 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-const taskColumns = `id, version, title, description, completed, created_at, completed_at, author_user_id, list_id, due_at, due_all_day, repeat_rule`
+const taskColumns = `id, version, title, description, completed, created_at, completed_at, author_user_id, list_id, due_at, due_all_day, repeat_rule, remind_before_minutes, reminded_at`
 
 type TaskModel struct {
 	ID           int
@@ -21,6 +21,8 @@ type TaskModel struct {
 	DueAt        *time.Time
 	DueAllDay    bool
 	RepeatRule   *string
+	RemindBefore *int
+	RemindedAt   *time.Time
 }
 
 // scanner покрывает и core_postgres_pool.Row, и core_postgres_pool.Rows.
@@ -44,6 +46,8 @@ func scanTaskModel(s scanner) (TaskModel, error) {
 		&taskModel.DueAt,
 		&taskModel.DueAllDay,
 		&taskModel.RepeatRule,
+		&taskModel.RemindBefore,
+		&taskModel.RemindedAt,
 	)
 
 	return taskModel, err
@@ -71,6 +75,9 @@ func taskDomainFromModel(taskModel TaskModel) domain.Task {
 			task.Repeat = &repeat
 		}
 	}
+
+	task.RemindBeforeMinutes = taskModel.RemindBefore
+	task.RemindedAt = taskModel.RemindedAt
 
 	return task
 }

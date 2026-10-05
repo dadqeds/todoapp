@@ -19,6 +19,8 @@ type TaskDTOResponse struct {
 	DueAt        *time.Time `json:"due_at"`
 	DueAllDay    bool       `json:"due_all_day"`
 	Repeat       *RepeatDTO `json:"repeat"`
+	// За сколько минут до срока напомнить: 0, 15, 60, 1440; null — без напоминания.
+	RemindBeforeMinutes *int `json:"remind_before_minutes" example:"15"`
 }
 
 // RepeatDTO — правило повтора. weekdays нужны только для weekly (1 = пн … 7 = вс);
@@ -60,6 +62,8 @@ func taskDTOFromDomain(task domain.Task) TaskDTOResponse {
 		DueAt:        task.DueAt,
 		DueAllDay:    task.DueAllDay,
 		Repeat:       repeatDTOFromDomain(task.Repeat),
+
+		RemindBeforeMinutes: task.RemindBeforeMinutes,
 	}
 }
 

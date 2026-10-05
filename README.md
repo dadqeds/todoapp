@@ -55,6 +55,17 @@ make todoapp-run
 UPDATE todoapp.users SET telegram_id = <ваш id> WHERE id = <id пользователя>;
 ```
 
+## Уведомления
+
+Если задан `AUTH_TELEGRAM_BOT_TOKEN`, сервер раз в минуту проверяет и отправляет через бота:
+
+- **напоминания о сроках** — у задачи `remind_before_minutes`: `0` (в срок), `15`, `60`, `1440` (за день). Для задачи на весь день отсчёт идёт от времени утренней сводки в день срока. Получает автор задачи. Если срок уже прошёл (сервер был выключен), напоминание не отправляется;
+- **утреннюю сводку** — сегодняшние и просроченные задачи из своих и общих списков, раз в день в выбранное время по часовому поясу пользователя. Пустая не отправляется; опоздавшая больше чем на 3 часа — тоже.
+
+Включаются в профиле (`remind_enabled`, `digest_enabled`, `digest_time`). Мини-апп при включении просит у Telegram разрешение на сообщения от бота: без него бот не может написать первым. Кнопки в сообщениях ведут на `t.me/<бот>?startapp` (нужен `AUTH_TELEGRAM_BOT_USERNAME` и главный мини-апп в BotFather).
+
+Серверу нужен прямой доступ к `api.telegram.org`. Токен бота в логи не попадает: из сетевых ошибок адрес запроса вырезается.
+
 ## Make-цели
 
 | Цель | Что делает |
@@ -103,6 +114,7 @@ make db-restore file=out/backups/todoapp-2026-10-05_19-35-09.dump
 | `POSTGRES_MAX_CONNS`, `POSTGRES_MIN_CONNS`, `POSTGRES_MAX_CONN_LIFETIME`, `POSTGRES_MAX_CONN_IDLE_TIME` | дефолты pgxpool | Настройки пула |
 | `AUTH_TELEGRAM_BOT_TOKEN` | — | Токен бота. Без него публичный API отвечает 401 |
 | `AUTH_TELEGRAM_BOT_USERNAME` | пусто | Имя бота без `@` для ссылок-приглашений |
+| `AUTH_TELEGRAM_API_URL` | `https://api.telegram.org` | Адрес Bot API (для проверки с заглушкой) |
 | `AUTH_INIT_DATA_MAX_AGE` | `24h` | Срок жизни `initData` |
 | `AUTH_ADMIN_TELEGRAM_IDS` | пусто | Telegram id администраторов через запятую |
 | `AUTH_LOCAL_ADDR` | пусто (в compose `:5051`, в `make todoapp-run` `127.0.0.1:5051`) | Локальный адрес без Telegram |

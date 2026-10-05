@@ -28,7 +28,15 @@ type User struct {
 	// Timezone — пояс IANA (Europe/Moscow), по нему считаются повторы и время
 	// уведомлений. Пустой — UTC.
 	Timezone string
+
+	// Уведомления от бота: напоминания о сроках и утренняя сводка.
+	// DigestMinute — время сводки, минуты от полуночи по местному времени.
+	RemindEnabled bool
+	DigestEnabled bool
+	DigestMinute  int
 }
+
+const DefaultDigestMinute = 9 * 60
 
 // Location возвращает часовой пояс пользователя, при ошибке — UTC.
 func (u *User) Location() *time.Location {
@@ -93,6 +101,14 @@ func (u *User) Validate() error {
 		)
 	}
 
+	if u.DigestMinute < 0 || u.DigestMinute > 24*60-1 {
+		return fmt.Errorf(
+			"invalid `DigestMinute` %d: %w",
+			u.DigestMinute,
+			core_errors.ErrInvalidArgument,
+		)
+	}
+
 	if u.Timezone != "" {
 		if _, err := time.LoadLocation(u.Timezone); err != nil || len(u.Timezone) > 64 {
 			return fmt.Errorf(
@@ -127,11 +143,24 @@ type UserPatch struct {
 	PhoneNumber Nullable[string]
 	Timezone    Nullable[string]
 
+	RemindEnabled Nullable[bool]
+	DigestEnabled Nullable[bool]
+	DigestMinute  Nullable[int]
+
 	// ExpectedVersion — см. TaskPatch.ExpectedVersion.
 	ExpectedVersion *int
 }
 
 func (p *UserPatch) Validate() error {
+	if (p.RemindEnabled.Set && p.RemindEnabled.Value == nil) ||
+		(p.DigestEnabled.Set && p.DigestEnabled.Value == nil) ||
+		(p.DigestMinute.Set && p.DigestMinute.Value == nil) {
+		return fmt.Errorf(
+			"notification settings can't be patched to NULL: %w",
+			core_errors.ErrInvalidArgument,
+		)
+	}
+
 	if p.Timezone.Set && p.Timezone.Value == nil {
 		return fmt.Errorf(
 			"`Timezone` can't be patched to NULL: %w",
@@ -170,6 +199,18 @@ func (u *User) ApplyPatch(patch UserPatch) error {
 
 	if patch.Timezone.Set {
 		tmp.Timezone = *patch.Timezone.Value
+	}
+
+	if patch.RemindEnabled.Set {
+		tmp.RemindEnabled = *patch.RemindEnabled.Value
+	}
+
+	if patch.DigestEnabled.Set {
+		tmp.DigestEnabled = *patch.DigestEnabled.Value
+	}
+
+	if patch.DigestMinute.Set {
+		tmp.DigestMinute = *patch.DigestMinute.Value
 	}
 
 	if err := tmp.Validate(); err != nil {

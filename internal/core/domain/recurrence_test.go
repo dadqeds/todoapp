@@ -161,3 +161,48 @@ func TestUserTimezone(t *testing.T) {
 		t.Fatal("empty tz must be UTC")
 	}
 }
+
+func TestTaskReminder(t *testing.T) {
+	msk := mustLoc(t, "Europe/Moscow")
+	due := time.Date(2026, 10, 6, 20, 0, 0, 0, msk)
+	endOfDay := time.Date(2026, 10, 6, 23, 59, 59, 0, msk)
+
+	tests := []struct {
+		name string
+		task Task
+		want time.Time
+	}{
+		{"timed, at due", Task{DueAt: &due, RemindBeforeMinutes: ptr(0)}, due},
+		{"timed, hour before", Task{DueAt: &due, RemindBeforeMinutes: ptr(60)}, due.Add(-time.Hour)},
+		{"all day, at digest time", Task{DueAt: &endOfDay, DueAllDay: true, RemindBeforeMinutes: ptr(0)}, time.Date(2026, 10, 6, 8, 30, 0, 0, msk)},
+		{"all day, day before", Task{DueAt: &endOfDay, DueAllDay: true, RemindBeforeMinutes: ptr(1440)}, time.Date(2026, 10, 5, 8, 30, 0, 0, msk)},
+	}
+	for _, tt := range tests {
+		got, ok := tt.task.ReminderAt(msk, 8*60+30)
+		if !ok || !got.Equal(tt.want) {
+			t.Errorf("%s: got %v (%v), want %v", tt.name, got, ok, tt.want)
+		}
+	}
+
+	if _, ok := (&Task{DueAt: &due}).ReminderAt(msk, 540); ok {
+		t.Error("task without reminder must not have reminder time")
+	}
+
+	bad := Task{Title: "a", CreatedAt: time.Now(), DueAt: &due, RemindBeforeMinutes: ptr(30)}
+	if err := bad.Validate(); !errors.Is(err, core_errors.ErrInvalidArgument) {
+		t.Errorf("remind 30: err = %v", err)
+	}
+	noDue := Task{Title: "a", CreatedAt: time.Now(), RemindBeforeMinutes: ptr(0)}
+	if err := noDue.Validate(); !errors.Is(err, core_errors.ErrInvalidArgument) {
+		t.Errorf("remind without due: err = %v", err)
+	}
+
+	withRemind := Task{Title: "a", CreatedAt: time.Now(), DueAt: &due, RemindBeforeMinutes: ptr(15), Repeat: &Recurrence{Kind: RepeatDaily}}
+	next, _ := withRemind.NextOccurrence(due, msk)
+	if next.RemindBeforeMinutes == nil || *next.RemindBeforeMinutes != 15 {
+		t.Error("next occurrence must keep reminder")
+	}
+	if err := withRemind.ApplyPatch(TaskPatch{DueAt: setNull[time.Time]()}); err != nil || withRemind.RemindBeforeMinutes != nil {
+		t.Errorf("clearing due must clear reminder: %v, %v", err, withRemind.RemindBeforeMinutes)
+	}
+}

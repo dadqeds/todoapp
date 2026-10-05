@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	core_errors "github.com/dadqeds/todoapp/internal/core/errors"
@@ -27,7 +28,15 @@ type Task struct {
 
 	// Repeat — правило повтора; требует срока.
 	Repeat *Recurrence
+
+	// RemindBeforeMinutes — за сколько минут до срока напомнить (0 — в срок).
+	// RemindedAt — когда напоминание отправлено; сбрасывается при смене срока.
+	RemindBeforeMinutes *int
+	RemindedAt          *time.Time
 }
+
+// RemindOptions — допустимые значения напоминания: в срок, за 15 минут, за час, за день.
+var RemindOptions = []int{0, 15, 60, 1440}
 
 func NewTask(
 	id int,
@@ -128,6 +137,22 @@ func (t *Task) Validate() error {
 		)
 	}
 
+	if t.RemindBeforeMinutes != nil {
+		if t.DueAt == nil {
+			return fmt.Errorf(
+				"`RemindBeforeMinutes` requires `DueAt`: %w",
+				core_errors.ErrInvalidArgument,
+			)
+		}
+		if !slices.Contains(RemindOptions, *t.RemindBeforeMinutes) {
+			return fmt.Errorf(
+				"invalid `RemindBeforeMinutes` %d: %w",
+				*t.RemindBeforeMinutes,
+				core_errors.ErrInvalidArgument,
+			)
+		}
+	}
+
 	if t.Repeat != nil {
 		if t.DueAt == nil {
 			return fmt.Errorf(
@@ -178,6 +203,9 @@ type TaskPatch struct {
 
 	// Repeat=null выключает повтор. Снятие срока выключает повтор тоже.
 	Repeat Nullable[Recurrence]
+
+	// RemindBeforeMinutes=null выключает напоминание.
+	RemindBeforeMinutes Nullable[int]
 
 	// ExpectedVersion — версия, которую видел клиент. Если задана и не совпадает
 	// с текущей, патч отклоняется с ErrConflict (оптимистичная блокировка).
@@ -244,6 +272,7 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 		if tmp.DueAt == nil {
 			tmp.DueAllDay = false
 			tmp.Repeat = nil
+			tmp.RemindBeforeMinutes = nil
 		}
 	}
 
@@ -253,6 +282,15 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 
 	if patch.Repeat.Set {
 		tmp.Repeat = patch.Repeat.Value
+	}
+
+	if patch.RemindBeforeMinutes.Set {
+		tmp.RemindBeforeMinutes = patch.RemindBeforeMinutes.Value
+	}
+
+	// Новый срок или другое напоминание — напомнить нужно заново.
+	if patch.DueAt.Set || patch.DueAllDay.Set || patch.RemindBeforeMinutes.Set {
+		tmp.RemindedAt = nil
 	}
 
 	if patch.Completed.Set {
@@ -297,5 +335,28 @@ func (t *Task) NextOccurrence(now time.Time, loc *time.Location) (next Task, ok 
 
 	next = NewTaskUninitialized(t.Title, t.Description, t.AuthorUserID, t.ListID, &due, t.DueAllDay)
 	next.Repeat = &repeat
+	if t.RemindBeforeMinutes != nil {
+		remind := *t.RemindBeforeMinutes
+		next.RemindBeforeMinutes = &remind
+	}
 	return next, true
+}
+
+// ReminderAt — когда напомнить о задаче. Для задачи на весь день отсчёт идёт
+// от времени утренней сводки в день срока (digestMinute — минуты от полуночи
+// по местному времени), иначе — от самого срока.
+func (t *Task) ReminderAt(loc *time.Location, digestMinute int) (time.Time, bool) {
+	if t.RemindBeforeMinutes == nil || t.DueAt == nil {
+		return time.Time{}, false
+	}
+
+	before := time.Duration(*t.RemindBeforeMinutes) * time.Minute
+
+	if !t.DueAllDay {
+		return t.DueAt.Add(-before), true
+	}
+
+	local := t.DueAt.In(loc)
+	morning := time.Date(local.Year(), local.Month(), local.Day(), digestMinute/60, digestMinute%60, 0, 0, loc)
+	return morning.Add(-before), true
 }
