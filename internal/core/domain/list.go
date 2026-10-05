@@ -27,6 +27,9 @@ type List struct {
 	OwnerUserID int
 	IsDefault   bool
 	CreatedAt   time.Time
+
+	// InviteCode — код ссылки-приглашения; nil, если приглашение выключено.
+	InviteCode *string
 }
 
 func NewList(
@@ -108,9 +111,31 @@ func (l *List) ApplyPatch(patch ListPatch) error {
 	return nil
 }
 
-// ListSummary — список вместе со счётчиками задач для экрана списков.
+const (
+	ListRoleOwner  = "owner"
+	ListRoleMember = "member"
+)
+
+// ListMember — человек в списке: владелец или участник.
+type ListMember struct {
+	UserID   int
+	FullName string
+	Role     string
+	JoinedAt time.Time
+}
+
+// ListSummary — список вместе со счётчиками задач и участниками для экрана списков.
 type ListSummary struct {
 	List
 	OpenTasks  int
 	TotalTasks int
+
+	// Role — роль текущего пользователя в списке.
+	Role    string
+	Members []ListMember
+}
+
+// IsShared: в списке есть кто-то кроме владельца.
+func (s ListSummary) IsShared() bool {
+	return len(s.Members) > 1
 }

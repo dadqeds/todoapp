@@ -9,8 +9,8 @@ import (
 	core_errors "github.com/dadqeds/todoapp/internal/core/errors"
 )
 
-// GetLists возвращает списки пользователя. Обычный пользователь видит только
-// свои; администратор может запросить списки другого пользователя.
+// GetLists возвращает свои и общие списки пользователя. Администратор может
+// запросить списки другого пользователя.
 func (s *ListsService) GetLists(ctx context.Context, userID *int) ([]domain.ListSummary, error) {
 	actor, err := core_auth.FromContext(ctx)
 	if err != nil {
@@ -27,7 +27,7 @@ func (s *ListsService) GetLists(ctx context.Context, userID *int) ([]domain.List
 		return nil, fmt.Errorf("ensure default list: %w", err)
 	}
 
-	lists, err := s.listsRepository.GetLists(ctx, &owner)
+	lists, err := s.listsRepository.GetListsForUser(ctx, owner)
 	if err != nil {
 		return nil, fmt.Errorf("get lists from repository: %w", err)
 	}
@@ -35,19 +35,44 @@ func (s *ListsService) GetLists(ctx context.Context, userID *int) ([]domain.List
 	return lists, nil
 }
 
-func (s *ListsService) getAccessibleList(ctx context.Context, id int) (domain.List, error) {
+// getListForView: список видят владелец, участники и администратор.
+// Остальным он отдаётся как несуществующий.
+func (s *ListsService) getListForView(ctx context.Context, id int) (domain.List, core_auth.Actor, error) {
 	actor, err := core_auth.FromContext(ctx)
 	if err != nil {
-		return domain.List{}, err
+		return domain.List{}, actor, err
 	}
 
 	list, err := s.listsRepository.GetList(ctx, id)
 	if err != nil {
-		return domain.List{}, fmt.Errorf("get list from repository: %w", err)
+		return domain.List{}, actor, fmt.Errorf("get list from repository: %w", err)
+	}
+
+	if actor.CanAccessUser(list.OwnerUserID) {
+		return list, actor, nil
+	}
+
+	member, err := s.listsRepository.IsListMember(ctx, id, actor.User.ID)
+	if err != nil {
+		return domain.List{}, actor, fmt.Errorf("check list member: %w", err)
+	}
+	if !member {
+		return domain.List{}, actor, fmt.Errorf("list with id='%d': %w", id, core_errors.ErrNotFound)
+	}
+
+	return list, actor, nil
+}
+
+// getListForManage: менять список, приглашать и исключать может только владелец
+// (и администратор). Участник получает 403 — список он видит.
+func (s *ListsService) getListForManage(ctx context.Context, id int) (domain.List, error) {
+	list, actor, err := s.getListForView(ctx, id)
+	if err != nil {
+		return domain.List{}, err
 	}
 
 	if !actor.CanAccessUser(list.OwnerUserID) {
-		return domain.List{}, fmt.Errorf("list with id='%d': %w", id, core_errors.ErrNotFound)
+		return domain.List{}, fmt.Errorf("only owner can manage list with id='%d': %w", id, core_errors.ErrForbidden)
 	}
 
 	return list, nil
@@ -75,7 +100,7 @@ func (s *ListsService) CreateList(ctx context.Context, list domain.List) (domain
 }
 
 func (s *ListsService) PatchList(ctx context.Context, id int, patch domain.ListPatch) (domain.List, error) {
-	list, err := s.getAccessibleList(ctx, id)
+	list, err := s.getListForManage(ctx, id)
 	if err != nil {
 		return domain.List{}, err
 	}
@@ -94,7 +119,7 @@ func (s *ListsService) PatchList(ctx context.Context, id int, patch domain.ListP
 
 // DeleteList удаляет список вместе с задачами. Список по умолчанию удалить нельзя.
 func (s *ListsService) DeleteList(ctx context.Context, id int) error {
-	list, err := s.getAccessibleList(ctx, id)
+	list, err := s.getListForManage(ctx, id)
 	if err != nil {
 		return err
 	}

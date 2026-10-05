@@ -6,7 +6,7 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-const listColumns = `id, version, title, color, owner_user_id, is_default, created_at`
+const listColumns = `id, version, title, color, owner_user_id, is_default, created_at, invite_code`
 
 type ListModel struct {
 	ID          int
@@ -16,6 +16,7 @@ type ListModel struct {
 	OwnerUserID int
 	IsDefault   bool
 	CreatedAt   time.Time
+	InviteCode  *string
 }
 
 type scanner interface {
@@ -23,7 +24,7 @@ type scanner interface {
 }
 
 func listScanTargets(m *ListModel) []any {
-	return []any{&m.ID, &m.Version, &m.Title, &m.Color, &m.OwnerUserID, &m.IsDefault, &m.CreatedAt}
+	return []any{&m.ID, &m.Version, &m.Title, &m.Color, &m.OwnerUserID, &m.IsDefault, &m.CreatedAt, &m.InviteCode}
 }
 
 func scanListModel(s scanner) (ListModel, error) {
@@ -33,5 +34,7 @@ func scanListModel(s scanner) (ListModel, error) {
 }
 
 func listDomainFromModel(m ListModel) domain.List {
-	return domain.NewList(m.ID, m.Version, m.Title, m.Color, m.OwnerUserID, m.IsDefault, m.CreatedAt)
+	list := domain.NewList(m.ID, m.Version, m.Title, m.Color, m.OwnerUserID, m.IsDefault, m.CreatedAt)
+	list.InviteCode = m.InviteCode
+	return list
 }

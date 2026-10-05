@@ -19,9 +19,11 @@ func (s *TasksService) GetTasks(
 		return nil, err
 	}
 
-	// Обычный пользователь видит только свои задачи, фильтр user_id игнорируется.
-	if !actor.IsAdmin {
-		filter.AuthorUserID = &actor.User.ID
+	// По умолчанию — задачи из своих и общих списков. Обычному пользователю
+	// фильтр user_id недоступен; администратор с user_id видит задачи автора.
+	if !actor.IsAdmin || filter.AuthorUserID == nil {
+		filter.AuthorUserID = nil
+		filter.AccessibleToUserID = &actor.User.ID
 	}
 
 	l, o, err := domain.NormalizePagination(limit, offset)

@@ -29,7 +29,12 @@ func (f *fakeTasksRepository) GetTasks(_ context.Context, filter domain.TaskFilt
 }
 
 // Списки: 100 — по умолчанию у пользователя 10, 101 — ещё один у 10, 200 — у 20.
+// В списке 200 участвует пользователь 30.
 type fakeListsRepository struct{}
+
+func (fakeListsRepository) IsListMember(_ context.Context, listID, userID int) (bool, error) {
+	return listID == 200 && userID == 30, nil
+}
 
 var fakeLists = map[int]domain.List{
 	100: {ID: 100, OwnerUserID: 10, IsDefault: true},
@@ -82,8 +87,10 @@ func asActor(id int, isAdmin bool) context.Context {
 func newRepo() *fakeTasksRepository {
 	now := time.Now()
 	return &fakeTasksRepository{tasks: map[int]domain.Task{
-		1: {ID: 1, Version: 1, Title: "mine", CreatedAt: now, AuthorUserID: 10},
-		2: {ID: 2, Version: 1, Title: "foreign", CreatedAt: now, AuthorUserID: 20},
+		1: {ID: 1, Version: 1, Title: "mine", CreatedAt: now, AuthorUserID: 10, ListID: 100},
+		2: {ID: 2, Version: 1, Title: "foreign", CreatedAt: now, AuthorUserID: 20, ListID: 200},
+		// Задача 10-го в списке 200, из которого он не состоит (например, вышел).
+		3: {ID: 3, Version: 1, Title: "left", CreatedAt: now, AuthorUserID: 10, ListID: 200},
 	}}
 }
 
@@ -130,16 +137,24 @@ func TestGetTasksScope(t *testing.T) {
 	if _, err := newService(repo).GetTasks(asActor(10, false), domain.TaskFilter{AuthorUserID: &other}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	if repo.gotFilter.AuthorUserID == nil || *repo.gotFilter.AuthorUserID != 10 {
-		t.Fatalf("user sees user_id = %v, want 10", repo.gotFilter.AuthorUserID)
+	if repo.gotFilter.AuthorUserID != nil || repo.gotFilter.AccessibleToUserID == nil || *repo.gotFilter.AccessibleToUserID != 10 {
+		t.Fatalf("user filter = %+v, want only lists accessible to 10", repo.gotFilter)
 	}
 
 	repo = newRepo()
 	if _, err := newService(repo).GetTasks(asActor(10, true), domain.TaskFilter{}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	if repo.gotFilter.AuthorUserID != nil {
-		t.Fatalf("admin without filter got user_id = %v, want nil", *repo.gotFilter.AuthorUserID)
+	if repo.gotFilter.AuthorUserID != nil || repo.gotFilter.AccessibleToUserID == nil {
+		t.Fatalf("admin without user_id: filter = %+v, want own and shared lists", repo.gotFilter)
+	}
+
+	repo = newRepo()
+	if _, err := newService(repo).GetTasks(asActor(10, true), domain.TaskFilter{AuthorUserID: &other}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if repo.gotFilter.AuthorUserID == nil || *repo.gotFilter.AuthorUserID != other || repo.gotFilter.AccessibleToUserID != nil {
+		t.Fatalf("admin with user_id: filter = %+v, want author %d", repo.gotFilter, other)
 	}
 }
 
@@ -211,6 +226,35 @@ func TestPatchTaskCannotMoveToForeignList(t *testing.T) {
 
 	_, err := newService(newRepo()).PatchTask(asActor(10, false), 1, patch)
 	if !errors.Is(err, core_errors.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestSharedListMember(t *testing.T) {
+	repo := newRepo()
+	s := newService(repo)
+	member := asActor(30, false)
+
+	if _, err := s.GetTask(member, 2); err != nil {
+		t.Errorf("member reads task in shared list: %v", err)
+	}
+	if err := s.DeleteTask(member, 2); err != nil {
+		t.Errorf("member deletes task in shared list: %v", err)
+	}
+	if _, err := s.GetTask(member, 1); !errors.Is(err, core_errors.ErrNotFound) {
+		t.Errorf("member reads task from not shared list: err = %v, want ErrNotFound", err)
+	}
+
+	if _, err := s.CreateTask(member, domain.NewTaskUninitialized("t", nil, 0, 200, nil, false)); err != nil {
+		t.Fatalf("member creates task in shared list: %v", err)
+	}
+	if repo.created.AuthorUserID != 30 || repo.created.ListID != 200 {
+		t.Fatalf("created = %+v, want author 30 in list 200", repo.created)
+	}
+}
+
+func TestAuthorWhoLeftListLosesAccess(t *testing.T) {
+	if _, err := newService(newRepo()).GetTask(asActor(10, false), 3); !errors.Is(err, core_errors.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
 }

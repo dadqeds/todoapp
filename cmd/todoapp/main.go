@@ -85,6 +85,8 @@ func run() error {
 	}
 	defer pool.Close()
 
+	authConfig := core_auth.NewConfigMust()
+
 	logger.Debug("initializing feature", zap.String("feature", "users"))
 	usersRepository := users_postgres_repository.NewUsersRepository(pool)
 	usersService := users_service.NewUserService(usersRepository)
@@ -93,7 +95,7 @@ func run() error {
 	logger.Debug("initializing feature", zap.String("feature", "lists"))
 	listsRepository := lists_postgres_repository.NewListsRepository(pool)
 	listsService := lists_service.NewListsService(listsRepository)
-	listsTransportHTTP := lists_transport_http.NewListsHTTPHandler(listsService)
+	listsTransportHTTP := lists_transport_http.NewListsHTTPHandler(listsService, authConfig.TelegramBotUsername)
 
 	logger.Debug("initializing feature", zap.String("feature", "tasks"))
 	tasksRepository := tasks_postgres_repository.NewTasksRepository(pool)
@@ -113,7 +115,6 @@ func run() error {
 	logger.Debug("initializing HTTP servers")
 
 	httpConfig := core_http_server.NewConfigMust()
-	authConfig := core_auth.NewConfigMust()
 
 	if authConfig.TelegramBotToken == "" {
 		logger.Warn("AUTH_TELEGRAM_BOT_TOKEN is not set: API on public address will reject all requests")

@@ -22,7 +22,7 @@ const docTemplate = `{
                         "TelegramInitData": []
                     }
                 ],
-                "description": "Списки задач текущего пользователя со счётчиками. Список по умолчанию идёт первым и создаётся автоматически. Администратор может передать user_id",
+                "description": "Свои и общие списки текущего пользователя со счётчиками, ролью и участниками. Список по умолчанию идёт первым и создаётся автоматически. Администратор может передать user_id",
                 "produces": [
                     "application/json"
                 ],
@@ -123,6 +123,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/lists/join": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Код берётся из ссылки t.me/\u003cбот\u003e?startapp=join_\u003cкод\u003e. Повторное вступление ничего не меняет",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Вступить в список по приглашению",
+                "parameters": [
+                    {
+                        "description": "Код приглашения",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.JoinListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.ListDTOResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Приглашение не найдено или выключено",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/lists/{id}": {
             "delete": {
                 "security": [
@@ -130,7 +187,7 @@ const docTemplate = `{
                         "TelegramInitData": []
                     }
                 ],
-                "description": "Удаляет список вместе со всеми его задачами. Список по умолчанию удалить нельзя (409)",
+                "description": "Удаляет список вместе со всеми его задачами, только владелец (участнику — 403). Список по умолчанию удалить нельзя (409)",
                 "tags": [
                     "lists"
                 ],
@@ -186,7 +243,7 @@ const docTemplate = `{
                         "TelegramInitData": []
                     }
                 ],
-                "description": "Название и цвет. Необязательное поле 'version' защищает от одновременного изменения (409)",
+                "description": "Название и цвет, только владелец (участнику — 403). Необязательное поле 'version' защищает от одновременного изменения (409)",
                 "consumes": [
                     "application/json"
                 ],
@@ -248,6 +305,185 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/lists/{id}/invite": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Выдаёт новый код приглашения (прежняя ссылка перестаёт работать). Только владелец. Список по умолчанию расшарить нельзя (409). invite_link заполняется, если задан AUTH_TELEGRAM_BOT_USERNAME",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Ссылка-приглашение в список",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID списка",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.ListDTOResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Не владелец",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Список по умолчанию",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Ссылка перестаёт работать, уже вступившие остаются. Только владелец",
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Выключить приглашение",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID списка",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Приглашение выключено"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Не владелец",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/lists/{id}/members/{user_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Участник может удалить себя (выйти), владелец — любого участника. Владелец выйти не может (409)",
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Исключить участника или выйти из списка",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID списка",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID участника",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Участник удалён из списка"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Не владелец",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Владелец не может выйти",
                         "schema": {
                             "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
                         }
@@ -1027,6 +1263,20 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_features_lists_transport_http.JoinListRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "minLength": 8,
+                    "example": "pQ3x_Zr8k1LmN0aB"
+                }
+            }
+        },
         "internal_features_lists_transport_http.ListDTOResponse": {
             "type": "object",
             "properties": {
@@ -1049,6 +1299,15 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 3
                 },
+                "invite_code": {
+                    "description": "Только для владельца: код и ссылка приглашения, null — приглашение выключено.",
+                    "type": "string",
+                    "example": "pQ3x_Zr8k1LmN0aB"
+                },
+                "invite_link": {
+                    "type": "string",
+                    "example": "https://t.me/my_todo_bot?startapp=join_pQ3x_Zr8k1LmN0aB"
+                },
                 "is_default": {
                     "type": "boolean",
                     "example": false
@@ -1064,6 +1323,30 @@ const docTemplate = `{
                 "version": {
                     "type": "integer",
                     "example": 1
+                }
+            }
+        },
+        "internal_features_lists_transport_http.ListMemberDTO": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string",
+                    "example": "Анна"
+                },
+                "joined_at": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "owner",
+                        "member"
+                    ],
+                    "example": "member"
+                },
+                "user_id": {
+                    "type": "integer",
+                    "example": 7
                 }
             }
         },
@@ -1089,9 +1372,24 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 3
                 },
+                "invite_code": {
+                    "description": "Только для владельца: код и ссылка приглашения, null — приглашение выключено.",
+                    "type": "string",
+                    "example": "pQ3x_Zr8k1LmN0aB"
+                },
+                "invite_link": {
+                    "type": "string",
+                    "example": "https://t.me/my_todo_bot?startapp=join_pQ3x_Zr8k1LmN0aB"
+                },
                 "is_default": {
                     "type": "boolean",
                     "example": false
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_features_lists_transport_http.ListMemberDTO"
+                    }
                 },
                 "open_tasks": {
                     "type": "integer",
@@ -1100,6 +1398,14 @@ const docTemplate = `{
                 "owner_user_id": {
                     "type": "integer",
                     "example": 1
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "owner",
+                        "member"
+                    ],
+                    "example": "owner"
                 },
                 "title": {
                     "type": "string",

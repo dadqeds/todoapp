@@ -258,4 +258,6 @@ func (t *Task) ApplyPatch(patch TaskPatch) error {
 type TaskFilter struct {
 	AuthorUserID *int
 	ListID       *int
+	// AccessibleToUserID — задачи из списков, которыми пользователь владеет или в которых участвует.
+	AccessibleToUserID *int
 }
