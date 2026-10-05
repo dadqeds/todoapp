@@ -76,6 +76,7 @@ UPDATE todoapp.users SET telegram_id = <ваш id> WHERE id = <id пользов
 | `migrate-create seq=name` | Создать новую пару миграций |
 | `todoapp-run` | Запустить приложение локально (`go run`) |
 | `todoapp-deploy` / `todoapp-undeploy` | Собрать и запустить / остановить контейнер |
+| `server-up` / `server-update` | На сервере: запустить всё с Caddy / обновить код и перезапустить |
 | `swagger-gen` | Перегенерировать `docs/` |
 | `db-backup` | Сохранить копию базы в `out/backups/` (хранятся последние `BACKUP_KEEP`, по умолчанию 30) |
 | `db-restore file=…` | Восстановить базу из копии (спросит подтверждение) |
@@ -94,6 +95,40 @@ make db-restore file=out/backups/todoapp-2026-10-05_19-35-09.dump
 
 ```
 0 3 * * * cd /path/to/todoapp && make db-backup >> out/backups/cron.log 2>&1
+```
+
+## Сервер
+
+Для постоянной работы — VPS вне России (Telegram должен быть доступен напрямую) с Ubuntu, от 1 ГБ памяти. Туннель не нужен: HTTPS даёт Caddy (`docker-compose.prod.yaml`, `deploy/Caddyfile`), сертификат Let's Encrypt он получает и продлевает сам. Домен покупать не обязательно — подойдёт адрес из IP через [sslip.io](https://sslip.io): для `1.2.3.4` это `1-2-3-4.sslip.io`.
+
+1. Первичная настройка (от root, один раз): подкачка, Docker, файрвол (открыты только SSH, 80, 443), вход только по ключу, код в `/opt/todoapp`, ежедневная копия базы в 03:00:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/dadqeds/todoapp/main/deploy/setup.sh | bash
+   ```
+2. Настройки:
+   ```bash
+   cd /opt/todoapp && cp .env.example .env && nano .env
+   ```
+   Задать пароль базы, токен и имя бота, свой Telegram id, `LOGGER_LEVEL=INFO`, раскомментировать `COMPOSE_FILE` и указать `APP_DOMAIN`.
+3. Запуск: `make server-up` — база, миграции, приложение и Caddy. Всё перезапускается само после перезагрузки сервера.
+4. В @BotFather поменять адрес в *Menu Button* и *Configure Mini App* на `https://<APP_DOMAIN>`.
+
+Обновление после мержа в `main`: `make server-update` (копия базы, `git pull`, пересборка).
+
+Перенести базу с другой машины: там `make db-backup`, скопировать файл на сервер (`scp`), затем на сервере:
+
+```bash
+docker compose stop todoapp
+make db-restore file=out/backups/<файл>.dump
+docker compose start todoapp
+```
+
+Локальный адрес без Telegram на сервере слушает только `127.0.0.1:5051`. Открыть его со своего компьютера — через SSH-туннель: `ssh -L 5051:127.0.0.1:5051 root@<IP>`, затем `http://localhost:5051`.
+
+Копии базы лежат на том же сервере; время от времени забирайте их к себе:
+
+```bash
+scp -r root@<IP>:/opt/todoapp/out/backups ./server-backups
 ```
 
 ## Конфигурация
@@ -121,6 +156,7 @@ make db-restore file=out/backups/todoapp-2026-10-05_19-35-09.dump
 | `AUTH_LOCAL_TELEGRAM_ID` | — (обязателен, если задан `AUTH_LOCAL_ADDR`) | От чьего имени работает локальный адрес |
 | `LOGGER_LEVEL` | `DEBUG` | Уровень логирования |
 | `LOGGER_FOLDER` | — | Папка для файлов логов |
+| `COMPOSE_FILE`, `APP_DOMAIN` | — | Только на сервере: подключить `docker-compose.prod.yaml` и адрес для HTTPS |
 
 ## API
 

@@ -7,7 +7,7 @@ export PROJECT_ROOT
 .PHONY: env-up env-down env-cleanup env-port-forward env-port-close \
 	migrate-create migrate-up migrate-down migrate-action \
 	logs-cleanup todoapp-run todoapp-deploy todoapp-undeploy \
-	swagger-gen test vet lint check ps db-backup db-restore
+	swagger-gen test vet lint check ps db-backup db-restore server-up server-update
 
 env-up:
 	@docker compose up -d todoapp-postgres
@@ -107,6 +107,19 @@ todoapp-deploy:
 
 todoapp-undeploy:
 	@docker compose down todoapp
+
+# На сервере (в .env задан COMPOSE_FILE с docker-compose.prod.yaml):
+# база, миграции, приложение и Caddy с HTTPS.
+server-up:
+	@docker compose up -d todoapp-postgres
+	@$(MAKE) --no-print-directory migrate-up
+	@docker compose up -d --build todoapp caddy
+
+# Обновить код с GitHub и перезапустить; перед этим — копия базы.
+server-update:
+	@git pull --ff-only
+	@$(MAKE) --no-print-directory db-backup
+	@$(MAKE) --no-print-directory server-up
 
 swagger-gen:
 	@docker compose run --rm swagger \
