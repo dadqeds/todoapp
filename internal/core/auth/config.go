@@ -11,9 +11,11 @@ import (
 type Config struct {
 	// Токен бота от @BotFather. Без него вход через Telegram невозможен:
 	// публичный API отвечает 401, работает только локальный адрес.
-	TelegramBotToken string        `envconfig:"TELEGRAM_BOT_TOKEN"`
-	InitDataMaxAge   time.Duration `envconfig:"INIT_DATA_MAX_AGE"   default:"24h"`
-	AdminTelegramIDs []int64       `envconfig:"ADMIN_TELEGRAM_IDS"`
+	TelegramBotToken string `envconfig:"TELEGRAM_BOT_TOKEN"`
+	// Имя бота без @ — для ссылок-приглашений t.me/<бот>?startapp=...
+	TelegramBotUsername string        `envconfig:"TELEGRAM_BOT_USERNAME"`
+	InitDataMaxAge      time.Duration `envconfig:"INIT_DATA_MAX_AGE"   default:"24h"`
+	AdminTelegramIDs    []int64       `envconfig:"ADMIN_TELEGRAM_IDS"`
 
 	// Локальный адрес без проверки Telegram. Слушать его нужно только на
 	// 127.0.0.1 и никогда не пробрасывать наружу (туннель смотрит на HTTP_ADDR).

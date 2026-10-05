@@ -44,6 +44,8 @@ const ICONS = {
   chev: '<path d="M9 6l6 6-6 6"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+  share: '<path d="M12 4v11M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
   users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.8 3-6 6-6s5.2 2.2 6 6"/><path d="M15 5.5a3 3 0 010 5.9M17 14c2.2.6 3.5 2.2 4 5"/>',
 };
 const icon = (name, size = 20) =>
@@ -187,6 +189,9 @@ async function loadLists() {
   state.lists = Array.isArray(lists) ? lists : [];
 }
 const listById = id => state.lists.find(l => l.id === id);
+const isShared = list => (list?.members?.length || 0) > 1;
+const isOwner = list => list?.role !== "member";
+const memberName = (list, userId) => list?.members?.find(m => m.user_id === userId)?.full_name;
 const defaultList = () => state.lists.find(l => l.is_default) || state.lists[0];
 
 // ---------- Каркас ----------
@@ -243,8 +248,8 @@ async function loadTasks({ append = false } = {}) {
   if (!append) renderLoader();
   try {
     if (!state.lists.length) await loadLists();
+    // Без user_id сервер отдаёт задачи из своих и общих списков.
     const params = new URLSearchParams({
-      user_id: state.me.id,
       limit: PAGE_SIZE + 1,
       offset: append ? state.tasks.length : 0,
     });
@@ -261,12 +266,14 @@ async function loadTasks({ append = false } = {}) {
 
 function listChips() {
   const total = state.lists.reduce((sum, l) => sum + l.open_tasks, 0);
-  const chip = (value, label, count, color) =>
+  const chip = (value, label, count, color, shared) =>
     `<button class="chip" type="button" data-list="${value}" aria-pressed="${String(state.listFilter) === String(value)}" ${
       color ? colorStyle(color) : ""
-    }>${color ? '<span class="dot"></span>' : ""}${esc(label)}<span class="count">${count}</span></button>`;
+    }>${color ? '<span class="dot"></span>' : ""}${esc(label)}${
+      shared ? `<span class="count" aria-label="общий">${icon("users", 14)}</span>` : ""
+    }<span class="count">${count}</span></button>`;
   return `<div class="chips" role="group" aria-label="Списки">${chip("all", "Все", total)}${state.lists
-    .map(l => chip(l.id, l.title, l.open_tasks, l.color))
+    .map(l => chip(l.id, l.title, l.open_tasks, l.color, isShared(l)))
     .join("")}<button class="chip" type="button" id="newListChip" aria-label="Новый список">${icon("plus", 16)}</button></div>`;
 }
 
@@ -280,7 +287,11 @@ function taskCard(t) {
     <div class="task-body">
       <div class="task-title">${esc(t.title)}</div>
       ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
-      <div class="task-meta">${dueTag(t)}</div>
+      <div class="task-meta">${dueTag(t)}${
+        isShared(list) && t.author_user_id !== state.me.id
+          ? `<span class="tag">${esc(memberName(list, t.author_user_id) || "участник")}</span>`
+          : ""
+      }</div>
     </div>
     ${showDot ? `<span class="dot" ${colorStyle(list.color)} title="${esc(list.title)}"></span>` : ""}
   </article>`;
@@ -585,35 +596,162 @@ async function deleteTask(task) {
 }
 
 // ---------- Форма списка ----------
+function membersBlock(list) {
+  if (list.is_default) return "";
+  const owner = isOwner(list);
+  const rows = (list.members || [])
+    .map(m => {
+      const you = m.user_id === state.me.id;
+      const sub = m.role === "owner" ? (you ? "вы, владелец" : "владелец") : you ? "вы" : "";
+      const canRemove = owner && m.role !== "owner";
+      return `<div class="row"><span class="row-main">${esc(m.full_name)}${sub ? `<div class="row-sub">${sub}</div>` : ""}</span>${
+        canRemove
+          ? `<button class="icon-btn" type="button" data-remove-member="${m.user_id}" aria-label="Исключить ${esc(m.full_name)}">${icon("close", 18)}</button>`
+          : ""
+      }</div>`;
+    })
+    .join("");
+  return `<span class="field-label">Участники</span>
+    <div class="rows" style="background:var(--field)">${rows}</div>
+    ${owner ? '<div id="inviteBlock" style="margin-top:8px"></div>' : ""}`;
+}
+
+function renderInviteBlock(list) {
+  const block = $("#inviteBlock");
+  if (!block) return;
+  if (!list.invite_code) {
+    block.innerHTML = `<button class="btn quiet block" type="button" id="inviteCreate">${icon("users", 18)} Пригласить по ссылке</button>`;
+    $("#inviteCreate").onclick = () => createInvite(list);
+    return;
+  }
+  block.innerHTML = list.invite_link
+    ? `<div class="inline"><button class="btn primary" type="button" id="inviteShare">${icon("share", 18)} Поделиться</button>
+        <button class="btn quiet" type="button" id="inviteCopy">${icon("copy", 18)} Скопировать</button></div>
+       <p class="hint">Кто откроет ссылку в Telegram, попадёт в этот список.</p>
+       <button class="btn danger block" type="button" id="inviteRevoke">Сбросить ссылку</button>`
+    : `<p class="hint">Приглашение создано, но ссылку не собрать: на сервере не указано имя бота (AUTH_TELEGRAM_BOT_USERNAME).</p>
+       <button class="btn danger block" type="button" id="inviteRevoke">Выключить приглашение</button>`;
+  if (list.invite_link) {
+    $("#inviteShare").onclick = () => shareInvite(list);
+    $("#inviteCopy").onclick = () => copyInvite(list);
+  }
+  $("#inviteRevoke").onclick = () => revokeInvite(list);
+}
+
 function openListSheet(list = null) {
+  const owner = !list || isOwner(list);
   const color = list?.color || LIST_COLORS.find(c => !state.lists.some(l => l.color === c)) || "blue";
+  const disabled = owner ? "" : "disabled";
   openSheet(
     list ? "Список" : "Новый список",
     `<form id="listForm" novalidate>
-      <input class="field" id="listTitle" maxlength="50" placeholder="Например, «Дом»" value="${esc(list?.title)}" aria-label="Название списка" />
+      <input class="field" id="listTitle" maxlength="50" placeholder="Например, «Дом»" value="${esc(list?.title)}" aria-label="Название списка" ${disabled} />
       <span class="field-label">Цвет</span>
       <div class="palette" role="group" aria-label="Цвет списка">${LIST_COLORS.map(
         c =>
           `<button class="swatch" type="button" data-color="" data-value="${c}" aria-pressed="${c === color}" aria-label="${
             COLOR_NAMES[c]
-          }" ${colorStyle(c)}></button>`,
+          }" ${colorStyle(c)} ${disabled}></button>`,
       ).join("")}</div>
+      ${list ? membersBlock(list) : ""}
       <div class="sheet-actions">
-        <button class="btn primary block" type="submit">${list ? "Сохранить" : "Создать список"}</button>
+        ${owner ? `<button class="btn primary block" type="submit">${list ? "Сохранить" : "Создать список"}</button>` : ""}
         ${
-          list && !list.is_default
+          list && owner && !list.is_default
             ? `<button class="btn danger block" type="button" id="listDelete">Удалить список${
                 list.total_tasks ? ` и ${list.total_tasks} ${plural(list.total_tasks, "задачу", "задачи", "задач")}` : ""
               }</button>`
             : ""
         }
+        ${list && !owner ? '<button class="btn danger block" type="button" id="listLeave">Выйти из списка</button>' : ""}
       </div>
-      ${list?.is_default ? '<p class="hint">Это список по умолчанию, его нельзя удалить.</p>' : ""}
+      ${list?.is_default ? '<p class="hint">Это список по умолчанию: его нельзя удалить или сделать общим.</p>' : ""}
+      ${list && !owner ? '<p class="hint">Название и цвет меняет владелец списка.</p>' : ""}
     </form>`,
-    { onSubmit: () => saveList(list) },
+    { onSubmit: owner ? () => saveList(list) : null },
   );
-  bindChoice("[data-color]");
-  if (list && !list.is_default) $("#listDelete").onclick = () => deleteList(list);
+  if (owner) bindChoice("[data-color]");
+  if (!list) return;
+  if (owner && !list.is_default) {
+    $("#listDelete").onclick = () => deleteList(list);
+    renderInviteBlock(list);
+    document.querySelectorAll("[data-remove-member]").forEach(b => {
+      b.onclick = () => removeMember(list, Number(b.dataset.removeMember));
+    });
+  }
+  if (!owner) $("#listLeave").onclick = () => leaveList(list);
+}
+
+async function createInvite(list) {
+  try {
+    const updated = await api(`/lists/${list.id}/invite`, send("POST"), { 409: "Список по умолчанию нельзя сделать общим." });
+    Object.assign(list, { invite_code: updated.invite_code, invite_link: updated.invite_link });
+    renderInviteBlock(list);
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function revokeInvite(list) {
+  if (!(await ask("Старая ссылка перестанет работать. Уже вступившие останутся в списке."))) return;
+  try {
+    await api(`/lists/${list.id}/invite`, send("DELETE"));
+    Object.assign(list, { invite_code: null, invite_link: null });
+    renderInviteBlock(list);
+    toast("Ссылка сброшена");
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+function shareInvite(list) {
+  const text = `Присоединяйся к списку «${list.title}»`;
+  if (inTelegram && tg.openTelegramLink) {
+    tg.openTelegramLink(
+      `https://t.me/share/url?url=${encodeURIComponent(list.invite_link)}&text=${encodeURIComponent(text)}`,
+    );
+  } else if (navigator.share) {
+    navigator.share({ title: text, url: list.invite_link }).catch(() => {});
+  } else {
+    copyInvite(list);
+  }
+}
+
+async function copyInvite(list) {
+  try {
+    await navigator.clipboard.writeText(list.invite_link);
+    toast("Ссылка скопирована");
+  } catch {
+    toast(list.invite_link);
+  }
+}
+
+async function removeMember(list, userId) {
+  const name = memberName(list, userId) || "участника";
+  if (!(await ask(`Исключить ${name} из списка «${list.title}»?`))) return;
+  try {
+    await api(`/lists/${list.id}/members/${userId}`, send("DELETE"));
+    await closeSheet(true);
+    toast("Участник исключён");
+    await afterListsChanged();
+  } catch (err) {
+    await closeSheet(true);
+    handleError(err, afterListsChanged);
+  }
+}
+
+async function leaveList(list) {
+  if (!(await ask(`Выйти из списка «${list.title}»? Задачи в нём останутся у других участников.`))) return;
+  try {
+    await api(`/lists/${list.id}/members/${state.me.id}`, send("DELETE"));
+    if (state.listFilter === list.id) state.listFilter = "all";
+    await closeSheet(true);
+    toast("Вы вышли из списка");
+    await afterListsChanged();
+  } catch (err) {
+    await closeSheet(true);
+    handleError(err, afterListsChanged);
+  }
 }
 
 async function saveList(list) {
@@ -642,10 +780,11 @@ async function saveList(list) {
 }
 
 async function deleteList(list) {
-  const question = list.total_tasks
-    ? `Удалить список «${list.title}» и ${list.total_tasks} ${plural(list.total_tasks, "задачу", "задачи", "задач")} в нём?`
-    : `Удалить список «${list.title}»?`;
-  if (!(await ask(question))) return;
+  const tasks = list.total_tasks
+    ? ` и ${list.total_tasks} ${plural(list.total_tasks, "задачу", "задачи", "задач")} в нём`
+    : "";
+  const shared = isShared(list) ? " Участники тоже потеряют доступ." : "";
+  if (!(await ask(`Удалить список «${list.title}»${tasks}?${shared}`))) return;
   try {
     await api(`/lists/${list.id}`, send("DELETE"), { 409: "Список по умолчанию удалить нельзя." });
     if (state.listFilter === list.id) state.listFilter = "all";
@@ -776,7 +915,12 @@ async function renderProfile() {
         l => `<button class="row" type="button" data-edit-list="${l.id}" ${colorStyle(l.color)}>
           <span class="dot" style="width:10px;height:10px"></span>
           <span class="row-main">${esc(l.title)}</span>
-          <span class="row-sub">${l.open_tasks} ${plural(l.open_tasks, "задача", "задачи", "задач")}</span>
+          <span class="row-sub">${isShared(l) ? `${icon("users", 14)} ${l.members.length} · ` : ""}${l.open_tasks} ${plural(
+            l.open_tasks,
+            "задача",
+            "задачи",
+            "задач",
+          )}</span>
           <span class="chev">${icon("chev", 18)}</span></button>`,
       )
       .join("")}
@@ -980,6 +1124,25 @@ async function start() {
     return;
   }
   $("#tabbar").hidden = false;
+  await joinFromLink();
   switchTab("tasks");
+}
+
+// Ссылка t.me/<бот>?startapp=join_<код> открывает мини-апп с start_param.
+// Вне Telegram для проверки можно открыть /?join=<код>.
+async function joinFromLink() {
+  const param = (inTelegram ? tg.initDataUnsafe?.start_param : null) || "";
+  const code = param.startsWith("join_") ? param.slice(5) : new URLSearchParams(location.search).get("join");
+  if (!code) return;
+  try {
+    const list = await api("/lists/join", send("POST", { code }), {
+      404: "Ссылка-приглашение не работает: её сбросили или она неверная.",
+    });
+    state.listFilter = list.id;
+    toast(list.owner_user_id === state.me.id ? `Это ваш список «${list.title}»` : `Вы в списке «${list.title}»`);
+  } catch (err) {
+    toast(err.message, true);
+  }
+  if (!inTelegram) history.replaceState(null, "", location.pathname);
 }
 start();

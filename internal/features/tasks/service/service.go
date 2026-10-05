@@ -15,6 +15,7 @@ type TasksService struct {
 type ListsRepository interface {
 	GetList(ctx context.Context, id int) (domain.List, error)
 	GetOrCreateDefaultList(ctx context.Context, ownerUserID int) (domain.List, error)
+	IsListMember(ctx context.Context, listID int, userID int) (bool, error)
 }
 
 type TasksRepository interface {

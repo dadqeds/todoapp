@@ -25,6 +25,15 @@ func (r *TasksRepository) GetTasks(
 		conditions = append(conditions, fmt.Sprintf("author_user_id=$%d", len(args)))
 	}
 
+	if filter.AccessibleToUserID != nil {
+		args = append(args, *filter.AccessibleToUserID)
+		n := len(args)
+		conditions = append(conditions, fmt.Sprintf(
+			"list_id IN (SELECT id FROM todoapp.lists WHERE owner_user_id=$%d UNION SELECT list_id FROM todoapp.list_members WHERE user_id=$%d)",
+			n, n,
+		))
+	}
+
 	if filter.ListID != nil {
 		args = append(args, *filter.ListID)
 		conditions = append(conditions, fmt.Sprintf("list_id=$%d", len(args)))

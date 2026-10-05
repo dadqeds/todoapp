@@ -12,7 +12,7 @@ import (
 
 // GetLists 		godoc
 // @Summary 		Мои списки
-// @Description 	Списки задач текущего пользователя со счётчиками. Список по умолчанию идёт первым и создаётся автоматически. Администратор может передать user_id
+// @Description 	Свои и общие списки текущего пользователя со счётчиками, ролью и участниками. Список по умолчанию идёт первым и создаётся автоматически. Администратор может передать user_id
 // @Tags 			lists
 // @Produce 		json
 // @Security 		TelegramInitData
@@ -40,11 +40,7 @@ func (h *ListsHTTPHandler) GetLists(rw http.ResponseWriter, r *http.Request) {
 
 	response := make([]ListSummaryDTOResponse, len(lists))
 	for i, l := range lists {
-		response[i] = ListSummaryDTOResponse{
-			ListDTOResponse: listDTOFromDomain(l.List),
-			OpenTasks:       l.OpenTasks,
-			TotalTasks:      l.TotalTasks,
-		}
+		response[i] = h.listSummaryDTO(l)
 	}
 
 	responseHandler.JSONResponse(response, http.StatusOK)
@@ -83,7 +79,7 @@ func (h *ListsHTTPHandler) CreateList(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseHandler.JSONResponse(listDTOFromDomain(list), http.StatusCreated)
+	responseHandler.JSONResponse(h.listDTO(list, true), http.StatusCreated)
 }
 
 type PatchListRequest struct {
@@ -94,7 +90,7 @@ type PatchListRequest struct {
 
 // PatchList 		godoc
 // @Summary 		Изменить список
-// @Description 	Название и цвет. Необязательное поле 'version' защищает от одновременного изменения (409)
+// @Description 	Название и цвет, только владелец (участнику — 403). Необязательное поле 'version' защищает от одновременного изменения (409)
 // @Tags 			lists
 // @Accept 			json
 // @Produce 		json
@@ -134,12 +130,12 @@ func (h *ListsHTTPHandler) PatchList(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseHandler.JSONResponse(listDTOFromDomain(list), http.StatusOK)
+	responseHandler.JSONResponse(h.listDTO(list, true), http.StatusOK)
 }
 
 // DeleteList 		godoc
 // @Summary 		Удалить список
-// @Description 	Удаляет список вместе со всеми его задачами. Список по умолчанию удалить нельзя (409)
+// @Description 	Удаляет список вместе со всеми его задачами, только владелец (участнику — 403). Список по умолчанию удалить нельзя (409)
 // @Tags 			lists
 // @Security 		TelegramInitData
 // @Param 			id path int true "ID списка"
