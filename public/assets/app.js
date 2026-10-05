@@ -3,85 +3,136 @@ const API_BASE = "/api/v1";
 // Telegram Mini App. Вне Telegram (локальный адрес) объект есть, но initData пустой.
 const tg = window.Telegram?.WebApp;
 const inTelegram = Boolean(tg?.initData);
-// Справочник пользователей для имён, фильтров и выпадающих списков.
-// Хранится отдельно от постраничного списка на странице «Пользователи».
-const DIRECTORY_LIMIT = 500;
-const state = {
-  page: "tasks",
-  tasks: [],
-  taskHasMore: false,
-  taskPage: 0,
-  taskLimit: 20,
-  taskUser: "all",
-  users: [],
-  userHasMore: false,
-  userPage: 0,
-  userLimit: 20,
-  directory: [],
-  directoryLoaded: false,
-  stats: null,
-  me: null,
-  statsFilter: { user: "", from: "", to: "" },
+const PAGE_SIZE = 50;
+const LIST_COLORS = ["green", "violet", "coral", "blue", "pink", "amber"];
+const COLOR_NAMES = {
+  green: "Зелёный",
+  violet: "Фиолетовый",
+  coral: "Коралловый",
+  blue: "Синий",
+  pink: "Розовый",
+  amber: "Янтарный",
 };
+
+const state = {
+  tab: "tasks",
+  me: null,
+  lists: [],
+  listFilter: "all",
+  tasks: [],
+  hasMore: false,
+  statsPeriod: "week",
+  statsUser: "",
+  users: [],
+};
+
 const $ = s => document.querySelector(s);
 const esc = v =>
   String(v ?? "").replace(
     /[&<>'"]/g,
-    c =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        "'": "&#039;",
-        '"': "&quot;",
-      })[c],
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[c],
   );
-const initials = n =>
-  String(n || "?")
+const isAdmin = () => Boolean(state.me?.is_admin);
+
+const ICONS = {
+  tasks: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
+  stats: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
+  profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  check: '<path d="M5 12l4 4L19 6"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+  users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.8 3-6 6-6s5.2 2.2 6 6"/><path d="M15 5.5a3 3 0 010 5.9M17 14c2.2.6 3.5 2.2 4 5"/>',
+};
+const icon = (name, size = 20) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+const colorStyle = color => `style="--list-color: var(--c-${LIST_COLORS.includes(color) ? color : "blue"})"`;
+
+// ---------- Склонения и даты ----------
+function plural(n, one, few, many) {
+  const m10 = n % 10,
+    m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const dayDiff = (a, b) => Math.round((startOfDay(a) - startOfDay(b)) / 86400000);
+const pad = n => String(n).padStart(2, "0");
+const toDateInput = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const toTimeInput = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtTime = d => d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+
+function fmtDay(d, now = new Date()) {
+  const diff = dayDiff(d, now);
+  if (diff === 0) return "сегодня";
+  if (diff === 1) return "завтра";
+  if (diff === -1) return "вчера";
+  const opts = { day: "numeric", month: "short" };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = "numeric";
+  return d.toLocaleDateString("ru-RU", opts).replace(" г.", "").replace(".", "");
+}
+
+// Метка срока: красная — просрочено, жёлтая — сегодня, серая — позже.
+function dueTag(task) {
+  if (!task.due_at) return "";
+  const due = new Date(task.due_at);
+  const now = new Date();
+  const text = task.due_all_day ? fmtDay(due, now) : `${fmtDay(due, now)}, ${fmtTime(due)}`;
+  if (task.completed) return `<span class="tag">${esc(text)}</span>`;
+  const overdue = task.due_all_day ? dayDiff(due, now) < 0 : due < now;
+  if (overdue) return `<span class="tag over">просрочено, ${esc(text)}</span>`;
+  if (dayDiff(due, now) === 0) return `<span class="tag today">${esc(text)}</span>`;
+  return `<span class="tag">${esc(text)}</span>`;
+}
+
+// Срок «на весь день» хранится как конец дня по времени пользователя.
+function buildDue(date, time) {
+  if (!date) return { due_at: null, due_all_day: false };
+  const [y, m, d] = date.split("-").map(Number);
+  if (!time) return { due_at: new Date(y, m - 1, d, 23, 59, 59).toISOString(), due_all_day: true };
+  const [hh, mm] = time.split(":").map(Number);
+  return { due_at: new Date(y, m - 1, d, hh, mm).toISOString(), due_all_day: false };
+}
+
+function fmtDuration(seconds) {
+  if (seconds == null) return "—";
+  if (seconds < 60) return "меньше минуты";
+  const min = Math.round(seconds / 60);
+  if (min < 60) return `${min} мин`;
+  const h = Math.floor(min / 60),
+    restMin = min % 60;
+  if (h < 24) return restMin ? `${h} ч ${restMin} мин` : `${h} ч`;
+  const d = Math.floor(h / 24),
+    restH = h % 24;
+  const days = `${d} ${plural(d, "день", "дня", "дней")}`;
+  return restH ? `${days} ${restH} ч` : days;
+}
+
+const initials = name =>
+  String(name || "?")
     .trim()
     .split(/\s+/)
     .slice(0, 2)
     .map(x => x[0])
     .join("")
     .toUpperCase();
-const fmtDate = v => {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return esc(v);
-  return d
-    .toLocaleDateString("ru-RU", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-    .replace(" г.", "");
-};
-const icon = (name, size = 16) => {
-  const paths = {
-    calendar:
-      '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/>',
-    user: '<circle cx="12" cy="7" r="4"/><path d="M4 21c1-4.2 3.7-6 8-6s7 1.8 8 6"/>',
-    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    trash:
-      '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M9 4h6l1 3H8l1-3zM6 7l1 14h10l1-14"/>',
-    edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>',
-    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
-    check: '<path d="M5 12l4 4L19 6"/>',
-  };
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
-};
+
+// ---------- Уведомления ----------
 function toast(message, error = false) {
   const t = document.createElement("div");
   t.className = "toast" + (error ? " error" : "");
   t.setAttribute("role", error ? "alert" : "status");
   t.textContent = message;
   $("#toasts").appendChild(t);
-  setTimeout(() => t.remove(), 3400);
+  setTimeout(() => t.remove(), 3200);
 }
+const haptic = type => tg?.HapticFeedback?.notificationOccurred?.(type);
 
-// Понятные сообщения по коду ответа. Сервер отдаёт технический текст
-// на английском, показывать его пользователю не стоит.
+// ---------- API ----------
+// Понятные сообщения по коду ответа: сервер отдаёт технический текст на английском.
 const DEFAULT_MESSAGES = {
   400: "Проверьте введённые данные.",
   401: "Откройте приложение через Telegram-бота.",
@@ -108,10 +159,7 @@ async function api(path, options = {}, messages = {}) {
       },
     });
   } catch {
-    throw new ApiError(
-      0,
-      "Не удалось подключиться к серверу. Проверьте, что backend запущен.",
-    );
+    throw new ApiError(0, "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.");
   }
   const text = await r.text();
   let data = null;
@@ -126,560 +174,248 @@ async function api(path, options = {}, messages = {}) {
     const message =
       messages[r.status] ||
       DEFAULT_MESSAGES[r.status] ||
-      (r.status >= 500
-        ? "Ошибка сервера. Попробуйте позже."
-        : `Ошибка запроса (${r.status}).`);
+      (r.status >= 500 ? "Ошибка сервера. Попробуйте позже." : `Ошибка запроса (${r.status}).`);
     throw new ApiError(r.status, message);
   }
   return data;
 }
-// Запрашиваем на одну запись больше, чтобы знать, есть ли следующая страница.
-async function fetchPage(path, limit, offset) {
-  const sep = path.includes("?") ? "&" : "?";
-  const items = await api(
-    `${path}${sep}limit=${limit + 1}&offset=${offset}`,
-  );
-  const list = Array.isArray(items) ? items : [];
-  return { items: list.slice(0, limit), hasMore: list.length > limit };
-}
-const isAdmin = () => Boolean(state.me?.is_admin);
-async function loadDirectory(force = false) {
-  if (state.directoryLoaded && !force) return state.directory;
-  // Обычному пользователю список всех пользователей недоступен — только он сам.
-  if (!isAdmin()) {
-    state.directory = state.me ? [state.me] : [];
-    state.directoryLoaded = true;
-    return state.directory;
-  }
-  const users = await api(`/users?limit=${DIRECTORY_LIMIT}&offset=0`);
-  state.directory = Array.isArray(users) ? users : [];
-  state.directoryLoaded = true;
-  return state.directory;
-}
-function invalidateDirectory() {
-  state.directoryLoaded = false;
-}
-const userName = id =>
-  state.directory.find(u => String(u.id) === String(id))?.full_name ||
-  `Пользователь #${id}`;
+const send = (method, body) => ({ method, body: body === undefined ? undefined : JSON.stringify(body) });
 
-function renderShell(title, subtitle, action) {
-  $("#main").innerHTML =
-    `<div class="topbar"><div><h1 class="page-title">${title}</h1>${subtitle ? `<div class="subtitle">${subtitle}</div>` : ""}</div>${action || ""}</div><div id="page-content"></div>`;
+// ---------- Данные ----------
+async function loadLists() {
+  const lists = await api("/lists");
+  state.lists = Array.isArray(lists) ? lists : [];
 }
-function renderLoader() {
-  $("#page-content").innerHTML =
-    '<div class="center"><div class="loader" aria-label="Загрузка"></div></div>';
-}
-function renderError(e) {
-  $("#page-content").innerHTML =
-    `<div class="error-box" role="alert">${esc(e.message)}</div>`;
-  toast(e.message, true);
-}
-function setActive() {
-  document.querySelectorAll(".nav button").forEach(b => {
-    const active = b.dataset.page === state.page;
-    b.classList.toggle("active", active);
+const listById = id => state.lists.find(l => l.id === id);
+const defaultList = () => state.lists.find(l => l.is_default) || state.lists[0];
+
+// ---------- Каркас ----------
+const TABS = { tasks: "Задачи", stats: "Статистика", profile: "Профиль" };
+function renderTabbar() {
+  document.querySelectorAll("#tabbar button").forEach(b => {
+    const tab = b.dataset.tab;
+    b.innerHTML = `${icon(tab, 22)}<span>${TABS[tab]}</span>`;
+    const active = tab === state.tab || (tab === "profile" && state.tab === "users");
     if (active) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
+    b.onclick = () => switchTab(tab);
   });
 }
-function pager(page, hasMore, prevId, nextId) {
-  return `<div class="pagination"><div>Страница ${page + 1}</div><div class="pager">
-    <button class="page-btn" id="${prevId}" aria-label="Предыдущая страница" ${page === 0 ? "disabled" : ""}>‹</button>
-    <button class="page-btn active" aria-current="page">${page + 1}</button>
-    <button class="page-btn" id="${nextId}" aria-label="Следующая страница" ${hasMore ? "" : "disabled"}>›</button>
-  </div></div>`;
+
+// Кнопка «Добавить задачу»: в Telegram — системная, иначе своя над меню.
+function updateAddButton() {
+  const visible = state.tab === "tasks" && !isSheetOpen();
+  if (inTelegram) {
+    $("#actionBar").hidden = true;
+    if (visible) tg.MainButton.show();
+    else tg.MainButton.hide();
+    return;
+  }
+  $("#actionBar").hidden = !visible;
 }
-function limitSelect(id, value) {
-  return `<select class="control" id="${id}">${[10, 20, 50]
-    .map(n => `<option value="${n}" ${value === n ? "selected" : ""}>${n}</option>`)
-    .join("")}</select>`;
+
+function renderLoader() {
+  $("#screen").innerHTML = '<div class="loader" role="status" aria-label="Загрузка"></div>';
+}
+
+function renderError(e, retry) {
+  $("#screen").innerHTML = `<div class="empty"><h2>Не получилось загрузить</h2><p>${esc(e.message)}</p>${
+    retry ? '<button class="btn primary" id="retryBtn" type="button">Повторить</button>' : ""
+  }</div>`;
+  if (retry) $("#retryBtn").onclick = retry;
+}
+
+async function switchTab(tab) {
+  if (isSheetOpen()) closeSheet(true);
+  state.tab = tab;
+  renderTabbar();
+  updateAddButton();
+  updateBackButton();
+  window.scrollTo(0, 0);
+  if (tab === "tasks") return loadTasks();
+  if (tab === "stats") return loadStats();
+  if (tab === "users") return loadUsers();
+  return renderProfile();
 }
 
 // ---------- Задачи ----------
-function taskStatus(t) {
-  return t.completed
-    ? `<span class="chip status-done">${icon("check", 14)} Выполнено</span>`
-    : `<span class="chip status-progress">${icon("clock", 14)} Открыта</span>`;
-}
-async function loadTasks() {
-  renderShell(
-    "Задачи",
-    "Список задач с пагинацией",
-    `<button class="btn primary" id="newTaskBtn">${icon("plus", 17)}&nbsp; Новая задача</button>`,
-  );
-  $("#newTaskBtn").onclick = () => openTaskModal();
-  renderLoader();
+async function loadTasks({ append = false } = {}) {
+  if (!append) renderLoader();
   try {
-    const limit = state.taskLimit;
-    const userFilter =
-      state.taskUser === "all" ? "" : `?user_id=${encodeURIComponent(state.taskUser)}`;
-    const [page] = await Promise.all([
-      fetchPage(`/tasks${userFilter}`, limit, state.taskPage * limit),
-      loadDirectory(),
-    ]);
-    state.tasks = page.items;
-    state.taskHasMore = page.hasMore;
+    if (!state.lists.length) await loadLists();
+    const params = new URLSearchParams({
+      user_id: state.me.id,
+      limit: PAGE_SIZE + 1,
+      offset: append ? state.tasks.length : 0,
+    });
+    if (state.listFilter !== "all") params.set("list_id", state.listFilter);
+    const page = (await api(`/tasks?${params}`)) || [];
+    state.hasMore = page.length > PAGE_SIZE;
+    const items = page.slice(0, PAGE_SIZE);
+    state.tasks = append ? state.tasks.concat(items) : items;
     renderTasks();
   } catch (e) {
-    renderError(e);
+    renderError(e, () => loadTasks());
   }
 }
-function renderTasks() {
-  const userOptions = [
-    '<option value="all">Все пользователи</option>',
-    ...state.directory.map(
-      u =>
-        `<option value="${u.id}" ${String(u.id) === String(state.taskUser) ? "selected" : ""}>${esc(u.full_name)} · ID ${u.id}</option>`,
-    ),
-  ].join("");
-  const empty =
-    state.taskUser === "all"
-      ? `<h3>Задач пока нет</h3><p>Нажмите «Новая задача», чтобы создать первую</p>`
-      : `<h3>У этого пользователя нет задач</h3><p>Выберите другого пользователя или сбросьте фильтр</p>`;
-  $("#page-content").innerHTML = `
-    <div class="filters">
-      ${isAdmin() ? `<label class="field-label" for="taskUser">Пользователь</label><select class="control" id="taskUser">${userOptions}</select>` : ""}
-      <label class="field-label" for="taskLimit">На странице</label>${limitSelect("taskLimit", state.taskLimit)}
-      <button class="btn reset" id="resetTasks">Сбросить</button>
-    </div>
-    <div class="list">${
-      state.tasks.length
-        ? state.tasks.map(taskCard).join("")
-        : `<div class="empty"><div><div class="empty-icon">${icon("check", 28)}</div>${empty}</div></div>`
-    }</div>
-    ${pager(state.taskPage, state.taskHasMore, "prevTask", "nextTask")}`;
 
-  if (isAdmin()) $("#taskUser").onchange = e => {
-    state.taskUser = e.target.value;
-    state.taskPage = 0;
-    loadTasks();
-  };
-  $("#taskLimit").onchange = e => {
-    state.taskLimit = Number(e.target.value);
-    state.taskPage = 0;
-    loadTasks();
-  };
-  $("#resetTasks").onclick = () => {
-    state.taskUser = "all";
-    state.taskPage = 0;
-    state.taskLimit = 20;
-    loadTasks();
-  };
-  $("#prevTask").onclick = () => {
-    state.taskPage--;
-    loadTasks();
-  };
-  $("#nextTask").onclick = () => {
-    state.taskPage++;
-    loadTasks();
-  };
-  document.querySelectorAll("[data-task-id]").forEach(card => {
-    const open = () => openTaskModal(Number(card.dataset.taskId));
-    card.addEventListener("click", e => {
-      if (!e.target.closest("button")) open();
-    });
-    card.addEventListener("keydown", e => {
-      if (e.target === card && (e.key === "Enter" || e.key === " ")) {
-        e.preventDefault();
-        open();
-      }
-    });
-  });
-  document.querySelectorAll("[data-complete-id]").forEach(
-    b => (b.onclick = () => toggleTask(Number(b.dataset.completeId))),
-  );
-  document.querySelectorAll("[data-edit-id]").forEach(
-    b => (b.onclick = () => openTaskModal(Number(b.dataset.editId))),
-  );
-  document.querySelectorAll("[data-delete-id]").forEach(
-    b => (b.onclick = () => deleteTask(Number(b.dataset.deleteId))),
-  );
+function listChips() {
+  const total = state.lists.reduce((sum, l) => sum + l.open_tasks, 0);
+  const chip = (value, label, count, color) =>
+    `<button class="chip" type="button" data-list="${value}" aria-pressed="${String(state.listFilter) === String(value)}" ${
+      color ? colorStyle(color) : ""
+    }>${color ? '<span class="dot"></span>' : ""}${esc(label)}<span class="count">${count}</span></button>`;
+  return `<div class="chips" role="group" aria-label="Списки">${chip("all", "Все", total)}${state.lists
+    .map(l => chip(l.id, l.title, l.open_tasks, l.color))
+    .join("")}<button class="chip" type="button" id="newListChip" aria-label="Новый список">${icon("plus", 16)}</button></div>`;
 }
+
 function taskCard(t) {
-  const dates = [
-    `<span class="chip" title="Создана">${icon("calendar", 14)} Создана ${fmtDate(t.created_at)}</span>`,
-    t.completed_at
-      ? `<span class="chip" title="Выполнена">${icon("check", 14)} Выполнена ${fmtDate(t.completed_at)}</span>`
-      : "",
-  ].join("");
-  return `<article class="task-card" data-task-id="${t.id}" tabindex="0" role="button" aria-label="Открыть задачу «${esc(t.title)}»">
-    <button class="check ${t.completed ? "done" : ""}" data-complete-id="${t.id}" aria-pressed="${t.completed}" title="${t.completed ? "Вернуть в работу" : "Отметить выполненной"}" aria-label="${t.completed ? "Вернуть в работу" : "Отметить выполненной"}">${t.completed ? icon("check", 16) : ""}</button>
-    <div class="task-main">
-      <div class="task-title ${t.completed ? "done" : ""}">${esc(t.title)}</div>
-      ${t.description ? `<div class="task-description">${esc(t.description)}</div>` : ""}
-      <div class="meta"><span class="chip">${icon("user", 14)} ${esc(userName(t.author_user_id))} · ID: ${t.author_user_id}</span>${dates}${taskStatus(t)}<span class="chip" title="Версия">v${esc(t.version ?? 1)}</span></div>
+  const list = listById(t.list_id);
+  const showDot = state.listFilter === "all" && list;
+  return `<article class="task${t.completed ? " done" : ""}" data-task="${t.id}">
+    <button class="task-check" type="button" data-check="${t.id}" aria-pressed="${t.completed}" aria-label="${
+      t.completed ? "Вернуть в работу" : "Отметить выполненной"
+    }: ${esc(t.title)}">${t.completed ? icon("check", 14) : ""}</button>
+    <div class="task-body">
+      <div class="task-title">${esc(t.title)}</div>
+      ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
+      <div class="task-meta">${dueTag(t)}</div>
     </div>
-    <div class="task-actions"><button class="btn icon small" data-edit-id="${t.id}" title="Изменить" aria-label="Изменить">${icon("edit", 16)}</button><button class="btn icon small danger" data-delete-id="${t.id}" title="Удалить" aria-label="Удалить">${icon("trash", 16)}</button></div>
+    ${showDot ? `<span class="dot" ${colorStyle(list.color)} title="${esc(list.title)}"></span>` : ""}
   </article>`;
 }
-// На 409 (задачу изменили в другом окне) перезагружаем список,
-// чтобы пользователь увидел актуальные данные.
-async function handleMutationError(err, reload) {
+
+function renderTasks() {
+  const filtered = state.listFilter !== "all";
+  const emptyText = filtered
+    ? "<h2>В этом списке пусто</h2><p>Добавьте первую задачу или выберите другой список.</p>"
+    : "<h2>Задач пока нет</h2><p>Запишите первое дело — оно появится здесь.</p>";
+  $("#screen").innerHTML = `
+    <div class="screen-head"><h1 class="title">Мои задачи</h1></div>
+    ${listChips()}
+    ${
+      state.tasks.length
+        ? `<div class="tasks">${state.tasks.map(taskCard).join("")}</div>`
+        : `<div class="empty">${emptyText}</div>`
+    }
+    ${state.hasMore ? '<button class="btn quiet block more" type="button" id="moreBtn">Показать ещё</button>' : ""}`;
+
+  document.querySelectorAll("[data-list]").forEach(b => {
+    b.onclick = () => {
+      state.listFilter = b.dataset.list === "all" ? "all" : Number(b.dataset.list);
+      loadTasks();
+    };
+  });
+  $("#newListChip").onclick = () => openListSheet();
+  if (state.hasMore) $("#moreBtn").onclick = () => loadTasks({ append: true });
+  document.querySelectorAll("[data-task]").forEach(card => {
+    card.onclick = e => {
+      if (e.target.closest("[data-check]")) return;
+      openTaskSheet(state.tasks.find(t => t.id === Number(card.dataset.task)));
+    };
+  });
+  document.querySelectorAll("[data-check]").forEach(b => {
+    b.onclick = () => toggleTask(Number(b.dataset.check));
+  });
+}
+
+// На 409/404 (изменили в другом окне) перезагружаем, чтобы показать актуальное.
+async function handleError(err, reload) {
   toast(err.message, true);
   if (err.status === 409 || err.status === 404) await reload();
 }
+
+async function refreshListsAndTasks() {
+  await loadLists();
+  await loadTasks();
+}
+
 async function toggleTask(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
   try {
-    await api(`/tasks/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ completed: !t.completed, version: t.version }),
-    });
-    toast(t.completed ? "Задача возвращена в работу" : "Задача выполнена");
-    if (inTelegram && !t.completed) tg.HapticFeedback?.notificationOccurred("success");
-    loadTasks();
+    await api(`/tasks/${id}`, send("PATCH", { completed: !t.completed, version: t.version }));
+    if (!t.completed) haptic("success");
+    toast(t.completed ? "Задача снова в работе" : "Задача выполнена");
+    await refreshListsAndTasks();
   } catch (err) {
-    handleMutationError(err, loadTasks);
-  }
-}
-async function openTaskModal(id = null) {
-  let t = null;
-  let users;
-  try {
-    [t, users] = await Promise.all([
-      id ? api(`/tasks/${id}`) : null,
-      loadDirectory(),
-    ]);
-  } catch (e) {
-    handleMutationError(e, loadTasks);
-    return;
-  }
-  if (!id && isAdmin() && !users.length) {
-    toast("Сначала создайте пользователя — задаче нужен автор.", true);
-    return;
-  }
-  $("#modal").innerHTML = `
-    <div class="modal-head"><h2 class="modal-title" id="modalTitle">${id ? "Редактировать задачу" : "Новая задача"}</h2><button class="btn icon" id="closeModal" aria-label="Закрыть">×</button></div>
-    <form class="form" id="taskForm">
-      ${id || !isAdmin() ? "" : `<label>Автор<select class="control" id="taskAuthor" required>${users.map(u => `<option value="${u.id}" ${String(u.id) === String(state.taskUser) ? "selected" : ""}>${esc(u.full_name)} · ID ${u.id}</option>`).join("")}</select></label>`}
-      <label>Название<input class="control" id="taskTitle" maxlength="100" required value="${esc(t?.title || "")}"></label>
-      <label>Описание<span class="hint"> — можно оставить пустым</span><textarea class="control" id="taskDesc" maxlength="1000">${esc(t?.description || "")}</textarea></label>
-      ${id ? `<label>Статус<select class="control" id="taskCompleted"><option value="false" ${!t.completed ? "selected" : ""}>Открыта</option><option value="true" ${t.completed ? "selected" : ""}>Выполнена</option></select></label>` : ""}
-      <div class="form-actions"><button type="button" class="btn" id="cancelModal">Отмена</button><button class="btn primary">${id ? "Сохранить" : "Создать задачу"}</button></div>
-    </form>`;
-  showModal();
-  $("#taskForm").onsubmit = async e => {
-    e.preventDefault();
-    const title = $("#taskTitle").value.trim();
-    const description = $("#taskDesc").value.trim();
-    if (!title) {
-      toast("Название не может быть пустым.", true);
-      return;
-    }
-    try {
-      if (id) {
-        const body = {};
-        if (title !== t.title) body.title = title;
-        if (description !== (t.description || ""))
-          body.description = description || null;
-        const completed = $("#taskCompleted").value === "true";
-        if (completed !== Boolean(t.completed)) body.completed = completed;
-        if (!Object.keys(body).length) {
-          closeModal();
-          return;
-        }
-        body.version = t.version;
-        await api(`/tasks/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
-        toast("Задача обновлена");
-      } else {
-        await api(
-          "/tasks",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              author_user_id: isAdmin() ? Number($("#taskAuthor").value) : undefined,
-              title,
-              description: description || undefined,
-            }),
-          },
-          { 404: "Автор не найден — возможно, его удалили." },
-        );
-        toast("Задача создана");
-      }
-      closeModal();
-      loadTasks();
-    } catch (err) {
-      if (err.status === 409 || err.status === 404) closeModal();
-      handleMutationError(err, loadTasks);
-    }
-  };
-}
-async function deleteTask(id) {
-  if (!(await ask("Удалить эту задачу?"))) return;
-  try {
-    await api(`/tasks/${id}`, { method: "DELETE" });
-    toast("Задача удалена");
-    // Удалили последнюю задачу на странице — шагаем назад.
-    if (state.tasks.length === 1 && state.taskPage > 0) state.taskPage--;
-    loadTasks();
-  } catch (e) {
-    handleMutationError(e, loadTasks);
+    handleError(err, refreshListsAndTasks);
   }
 }
 
-// ---------- Пользователи ----------
-async function loadUsers() {
-  renderShell(
-    "Пользователи",
-    "Управление пользователями",
-    `<button class="btn primary" id="newUserBtn">${icon("plus", 17)}&nbsp; Новый пользователь</button>`,
-  );
-  $("#newUserBtn").onclick = () => openUserModal();
-  renderLoader();
-  try {
-    const limit = state.userLimit;
-    const page = await fetchPage("/users", limit, state.userPage * limit);
-    state.users = page.items;
-    state.userHasMore = page.hasMore;
-    renderUsers();
-  } catch (e) {
-    renderError(e);
+// ---------- Нижний лист ----------
+let sheetDirty = false;
+let sheetOnSubmit = null;
+let lastFocused = null;
+const isSheetOpen = () => $("#sheetBackdrop").classList.contains("open");
+
+function openSheet(title, body, { onSubmit } = {}) {
+  lastFocused = document.activeElement;
+  sheetDirty = false;
+  sheetOnSubmit = onSubmit || null;
+  $("#sheet").innerHTML = `<div class="sheet-grip"></div>
+    <div class="sheet-head"><h2 class="sheet-title" id="sheetTitle">${title}</h2>
+    <button class="icon-btn" type="button" id="sheetClose" aria-label="Закрыть">${icon("close")}</button></div>
+    ${body}`;
+  $("#sheetBackdrop").classList.add("open");
+  document.body.style.overflow = "hidden";
+  $("#sheetClose").onclick = () => closeSheet();
+  const form = $("#sheet form");
+  if (form) {
+    form.addEventListener("input", () => setDirty(true));
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      sheetOnSubmit?.();
+    });
   }
-}
-function renderUsers() {
-  if (!state.users.length && state.userPage === 0) {
-    $("#page-content").innerHTML =
-      `<div class="empty"><div><div class="empty-icon">${icon("user", 28)}</div><h3>Пользователей пока нет</h3><p>Создайте пользователя, чтобы назначать задачи</p></div></div>`;
-    return;
-  }
-  $("#page-content").innerHTML = `
-    <div class="filters">
-      <label class="field-label" for="userLimit">На странице</label>${limitSelect("userLimit", state.userLimit)}
-      <button class="btn reset" id="reloadUsers">Обновить</button>
-    </div>
-    <div class="grid">${state.users
-      .map(
-        u => `<article class="user-card">
-          <div class="user-head"><div class="avatar" aria-hidden="true">${esc(initials(u.full_name))}</div><div><div class="user-name">${esc(u.full_name)}</div><div class="user-id">ID: ${esc(u.id)}</div></div></div>
-          <div class="user-line"><span>Телефон</span><span>${esc(u.phone_number || "Не указан")}</span></div>
-          <div class="user-line"><span>Версия</span><span>v${esc(u.version ?? 1)}</span></div>
-          <div class="card-actions"><button class="btn small" data-user-edit="${u.id}">${icon("edit", 15)} Изменить</button><button class="btn small danger" data-user-delete="${u.id}" aria-label="Удалить пользователя ${esc(u.full_name)}" title="Удалить">${icon("trash", 15)}</button></div>
-        </article>`,
-      )
-      .join("")}</div>
-    ${pager(state.userPage, state.userHasMore, "prevUser", "nextUser")}`;
-  $("#userLimit").onchange = e => {
-    state.userLimit = Number(e.target.value);
-    state.userPage = 0;
-    loadUsers();
-  };
-  $("#reloadUsers").onclick = loadUsers;
-  $("#prevUser").onclick = () => {
-    state.userPage--;
-    loadUsers();
-  };
-  $("#nextUser").onclick = () => {
-    state.userPage++;
-    loadUsers();
-  };
-  document
-    .querySelectorAll("[data-user-edit]")
-    .forEach(b => (b.onclick = () => openUserModal(Number(b.dataset.userEdit))));
-  document
-    .querySelectorAll("[data-user-delete]")
-    .forEach(b => (b.onclick = () => deleteUser(Number(b.dataset.userDelete))));
-}
-async function openUserModal(id = null) {
-  let u = null;
-  if (id) {
-    try {
-      u = await api(`/users/${id}`);
-    } catch (e) {
-      handleMutationError(e, loadUsers);
-      return;
-    }
-  }
-  $("#modal").innerHTML = `
-    <div class="modal-head"><h2 class="modal-title" id="modalTitle">${id ? "Редактировать пользователя" : "Новый пользователь"}</h2><button class="btn icon" id="closeModal" aria-label="Закрыть">×</button></div>
-    <form class="form" id="userForm">
-      <label>Имя и фамилия<input class="control" id="fullName" minlength="3" maxlength="100" required value="${esc(u?.full_name || "")}"></label>
-      <label>Телефон<span class="hint"> — формат +79991234567, необязательное поле</span><input class="control" id="phone" type="tel" inputmode="tel" pattern="\\+[0-9]{9,14}" title="Плюс и от 9 до 14 цифр, например +79991234567" maxlength="15" value="${esc(u?.phone_number || "")}"></label>
-      <div class="form-actions"><button type="button" class="btn" id="cancelModal">Отмена</button><button class="btn primary">${id ? "Сохранить" : "Создать пользователя"}</button></div>
-    </form>`;
-  showModal();
-  $("#userForm").onsubmit = async e => {
-    e.preventDefault();
-    const full_name = $("#fullName").value.trim();
-    const phone = $("#phone").value.trim();
-    try {
-      if (id) {
-        const body = {};
-        if (full_name !== u.full_name) body.full_name = full_name;
-        // Пустое поле означает «удалить телефон» — отправляем null, а не "".
-        if (phone !== (u.phone_number || "")) body.phone_number = phone || null;
-        if (!Object.keys(body).length) {
-          closeModal();
-          return;
-        }
-        body.version = u.version;
-        await api(`/users/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
-        toast("Пользователь обновлён");
-      } else {
-        await api("/users", {
-          method: "POST",
-          body: JSON.stringify({ full_name, phone_number: phone || undefined }),
-        });
-        toast("Пользователь создан");
-      }
-      invalidateDirectory();
-      closeModal();
-      loadUsers();
-    } catch (err) {
-      if (err.status === 409 || err.status === 404) closeModal();
-      handleMutationError(err, loadUsers);
-    }
-  };
-}
-async function deleteUser(id) {
-  if (!(await ask("Удалить пользователя?"))) return;
-  try {
-    await api(
-      `/users/${id}`,
-      { method: "DELETE" },
-      { 409: "У пользователя есть задачи — сначала удалите или завершите их." },
-    );
-    toast("Пользователь удалён");
-    invalidateDirectory();
-    if (state.users.length === 1 && state.userPage > 0) state.userPage--;
-    loadUsers();
-  } catch (e) {
-    toast(e.message, true);
-    if (e.status === 404) loadUsers();
-  }
+  updateAddButton();
+  updateBackButton();
+  $("#sheet").querySelector("input, textarea, select, button.chip")?.focus({ preventScroll: true });
 }
 
-// ---------- Статистика ----------
-// API принимает `to` не включительно, а в интерфейсе «по» — включительно.
-const nextDay = date => {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-};
-async function loadStats() {
-  renderShell("Статистика", "Сводная аналитика по задачам");
-  renderLoader();
-  const f = state.statsFilter;
-  const q = new URLSearchParams();
-  if (f.user) q.set("user_id", f.user);
-  if (f.from) q.set("from", f.from);
-  if (f.to) q.set("to", nextDay(f.to));
-  try {
-    const [s] = await Promise.all([
-      api(`/statistics?${q.toString()}`),
-      loadDirectory(),
-    ]);
-    state.stats = s;
-    renderStats(s);
-  } catch (e) {
-    renderError(e);
-  }
-}
-function bar(label, count, total) {
-  const pct = total ? (count / total) * 100 : 0;
-  return `<div class="bar-col">
-    <div class="bar-value">${count} · ${Math.round(pct)}%</div>
-    <div class="bar" style="height:${pct}%" role="img" aria-label="${label}: ${count} из ${total}"></div>
-    <div class="bar-label">${label}</div>
-  </div>`;
-}
-function renderStats(s) {
-  const f = state.statsFilter;
-  const created = Number(s?.tasks_created || 0),
-    completed = Number(s?.tasks_completed || 0),
-    rate = Math.round(Number(s?.tasks_completed_rate || 0) * 10) / 10,
-    avg = esc(s?.tasks_average_completion_time || "—");
-  const userOptions = state.directory
-    .map(
-      u =>
-        `<option value="${u.id}" ${String(u.id) === f.user ? "selected" : ""}>${esc(u.full_name)}</option>`,
-    )
-    .join("");
-  $("#page-content").innerHTML = `
-    <div class="filters stats">
-      ${isAdmin() ? `<label class="field-label" for="statUser">Пользователь</label><select class="control" id="statUser"><option value="">Все</option>${userOptions}</select>` : ""}
-      <label class="field-label" for="statFrom">С</label><input class="control" type="date" id="statFrom" value="${esc(f.from)}">
-      <label class="field-label" for="statTo">По</label><input class="control" type="date" id="statTo" value="${esc(f.to)}">
-      <div class="filter-actions"><button class="btn reset" id="applyStats">Применить</button><button class="btn reset" id="resetStats">Сбросить</button></div>
-    </div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">Создано задач</div><div class="stat-value">${created}</div></div>
-      <div class="stat-card"><div class="stat-label">Выполнено</div><div class="stat-value">${completed}</div></div>
-      <div class="stat-card"><div class="stat-label">Процент выполнения</div><div class="stat-value">${rate}%</div></div>
-      <div class="stat-card"><div class="stat-label">Среднее время выполнения</div><div class="stat-value" style="font-size:25px">${avg}</div></div>
-    </div>
-    <div class="bar-wrap">
-      <div style="font-size:17px;font-weight:700;margin-bottom:14px">Состояние задач</div>
-      ${created ? `<div class="bars">${bar("Открытые", created - completed, created)}${bar("Выполненные", completed, created)}</div>` : `<div class="subtitle">За выбранный период задач нет</div>`}
-    </div>`;
-  $("#applyStats").onclick = () => {
-    const from = $("#statFrom").value;
-    const to = $("#statTo").value;
-    if (from && to && to < from) {
-      toast("Дата «по» не может быть раньше даты «с».", true);
-      return;
-    }
-    state.statsFilter = { user: isAdmin() ? $("#statUser").value : "", from, to };
-    loadStats();
-  };
-  $("#resetStats").onclick = () => {
-    state.statsFilter = { user: "", from: "", to: "" };
-    loadStats();
-  };
+function setDirty(value) {
+  sheetDirty = value;
+  // В Telegram спрашиваем подтверждение, если окно закрывают с несохранённой формой.
+  if (inTelegram) value ? tg.enableClosingConfirmation() : tg.disableClosingConfirmation();
 }
 
-// В Telegram нативный confirm() работает не во всех клиентах — используем его попап.
+async function closeSheet(force = false) {
+  if (!isSheetOpen()) return;
+  if (!force && sheetDirty && !(await ask("Закрыть без сохранения?"))) return;
+  setDirty(false);
+  $("#sheetBackdrop").classList.remove("open");
+  document.body.style.overflow = "";
+  updateAddButton();
+  updateBackButton();
+  if (lastFocused && document.contains(lastFocused)) lastFocused.focus({ preventScroll: true });
+}
+
+function updateBackButton() {
+  if (!inTelegram) return;
+  if (isSheetOpen() || state.tab === "users") tg.BackButton.show();
+  else tg.BackButton.hide();
+}
+
 function ask(message) {
-  if (inTelegram && tg.showConfirm) {
-    return new Promise(resolve => tg.showConfirm(message, resolve));
-  }
+  if (inTelegram && tg.showConfirm) return new Promise(resolve => tg.showConfirm(message, resolve));
   return Promise.resolve(confirm(message));
 }
 
-// ---------- Модальное окно ----------
-let lastFocused = null;
-const isModalOpen = () => $("#modalBackdrop").classList.contains("show");
-function showModal() {
-  lastFocused = document.activeElement;
-  $("#modalBackdrop").classList.add("show");
-  document.body.style.overflow = "hidden";
-  $("#closeModal").onclick = closeModal;
-  $("#cancelModal").onclick = closeModal;
-  $("#modal").querySelector(".control")?.focus();
-  if (inTelegram) tg.BackButton.show();
-}
-function closeModal() {
-  if (!isModalOpen()) return;
-  $("#modalBackdrop").classList.remove("show");
-  document.body.style.overflow = "";
-  if (inTelegram) tg.BackButton.hide();
-  if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
-}
-$("#modalBackdrop").addEventListener("click", e => {
-  if (e.target.id === "modalBackdrop") closeModal();
+$("#sheetBackdrop").addEventListener("click", e => {
+  if (e.target.id === "sheetBackdrop") closeSheet();
 });
 document.addEventListener("keydown", e => {
-  if (!isModalOpen()) return;
-  if (e.key === "Escape") {
-    closeModal();
-    return;
-  }
-  // Не выпускаем фокус из открытого диалога.
+  if (!isSheetOpen()) return;
+  if (e.key === "Escape") return closeSheet();
+  // Не выпускаем фокус из открытого листа.
   if (e.key === "Tab") {
-    const focusable = [
-      ...$("#modal").querySelectorAll("button, input, select, textarea"),
-    ].filter(el => !el.disabled);
+    const focusable = [...$("#sheet").querySelectorAll("button, input, select, textarea")].filter(
+      el => !el.disabled && el.offsetParent !== null,
+    );
     if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+    const first = focusable[0],
+      last = focusable[focusable.length - 1];
     if (e.shiftKey && document.activeElement === first) {
       e.preventDefault();
       last.focus();
@@ -690,70 +426,560 @@ document.addEventListener("keydown", e => {
   }
 });
 
-// ---------- Навигация и тема ----------
-async function switchPage(page) {
-  state.page = page;
-  setActive();
-  if (page === "tasks") return loadTasks();
-  if (page === "users") return loadUsers();
-  return loadStats();
+// Группа чипов с одним выбранным значением.
+function bindChoice(selector, onChange) {
+  const buttons = [...document.querySelectorAll(selector)];
+  buttons.forEach(b => {
+    b.onclick = () => {
+      buttons.forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      setDirty(true);
+      onChange?.(b.dataset.value);
+    };
+  });
 }
-document
-  .querySelectorAll(".nav button")
-  .forEach(b => (b.onclick = () => switchPage(b.dataset.page)));
-function applyTheme() {
-  if (inTelegram) {
-    // В Telegram тема берётся из клиента, переключатель не нужен.
-    document.body.classList.toggle("dark", tg.colorScheme === "dark");
+const chosen = selector => document.querySelector(`${selector}[aria-pressed="true"]`)?.dataset.value;
+
+// ---------- Форма задачи ----------
+function openTaskSheet(task = null) {
+  const now = new Date();
+  const due = task?.due_at ? new Date(task.due_at) : null;
+  const today = toDateInput(now);
+  const tomorrow = toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  const dueDate = due ? toDateInput(due) : "";
+  const preset = !due ? "none" : dueDate === today ? "today" : dueDate === tomorrow ? "tomorrow" : "date";
+  const listId = task?.list_id ?? (state.listFilter !== "all" ? state.listFilter : defaultList()?.id);
+  const dueChip = (value, label) =>
+    `<button class="chip" type="button" data-due="" data-value="${value}" aria-pressed="${preset === value}">${label}</button>`;
+
+  openSheet(
+    task ? "Задача" : "Новая задача",
+    `<form id="taskForm" novalidate>
+      <input class="field" id="taskTitle" maxlength="100" placeholder="Что нужно сделать" value="${esc(task?.title)}" aria-label="Название" />
+      <textarea class="field" id="taskDesc" maxlength="1000" placeholder="Подробности, если нужны" aria-label="Описание" style="margin-top:8px">${esc(
+        task?.description,
+      )}</textarea>
+
+      <span class="field-label">Срок</span>
+      <div class="chips wrap">${dueChip("none", "Без срока")}${dueChip("today", "Сегодня")}${dueChip(
+        "tomorrow",
+        "Завтра",
+      )}${dueChip("date", "Другая дата")}</div>
+      <div id="dueFields" ${preset === "none" ? "hidden" : ""} style="margin-top:8px">
+        <div class="inline">
+          <input class="field" type="date" id="taskDate" value="${dueDate || today}" aria-label="Дата" ${
+            preset === "date" ? "" : "hidden"
+          } />
+          <input class="field" type="time" id="taskTime" value="${due && !task.due_all_day ? toTimeInput(due) : ""}" aria-label="Время" />
+        </div>
+        <p class="hint">Без времени — срок до конца дня.</p>
+      </div>
+
+      <span class="field-label">Список</span>
+      <div class="chips wrap">${state.lists
+        .map(
+          l =>
+            `<button class="chip" type="button" data-tlist="" data-value="${l.id}" aria-pressed="${l.id === listId}" ${colorStyle(
+              l.color,
+            )}><span class="dot"></span>${esc(l.title)}</button>`,
+        )
+        .join("")}</div>
+
+      <div class="sheet-actions">
+        <button class="btn primary block" type="submit">${task ? "Сохранить" : "Создать задачу"}</button>
+        ${
+          task
+            ? `<button class="btn quiet block" type="button" id="taskToggle">${
+                task.completed ? "Вернуть в работу" : "Отметить выполненной"
+              }</button><button class="btn danger block" type="button" id="taskDelete">Удалить задачу</button>`
+            : ""
+        }
+      </div>
+    </form>`,
+    { onSubmit: () => saveTask(task) },
+  );
+
+  bindChoice("[data-due]", value => {
+    $("#dueFields").hidden = value === "none";
+    $("#taskDate").hidden = value !== "date";
+  });
+  bindChoice("[data-tlist]");
+  if (task) {
+    $("#taskToggle").onclick = async () => {
+      await closeSheet(true);
+      toggleTask(task.id);
+    };
+    $("#taskDelete").onclick = () => deleteTask(task);
+  }
+}
+
+function readDue() {
+  const preset = chosen("[data-due]");
+  if (preset === "none") return { due_at: null, due_all_day: false };
+  const now = new Date();
+  const date =
+    preset === "today"
+      ? toDateInput(now)
+      : preset === "tomorrow"
+        ? toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))
+        : $("#taskDate").value;
+  return buildDue(date, $("#taskTime").value);
+}
+
+async function saveTask(task) {
+  const title = $("#taskTitle").value.trim();
+  const description = $("#taskDesc").value.trim();
+  if (!title) {
+    toast("Напишите, что нужно сделать.", true);
+    $("#taskTitle").focus();
     return;
   }
-  let savedTheme = null;
+  if (chosen("[data-due]") === "date" && !$("#taskDate").value) {
+    toast("Выберите дату срока.", true);
+    return;
+  }
+  const due = readDue();
+  const listId = Number(chosen("[data-tlist]"));
   try {
-    savedTheme = localStorage.getItem("todo-theme");
-  } catch {}
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-  document.body.classList.toggle("dark", savedTheme === "dark" || (!savedTheme && prefersDark));
+    if (task) {
+      const body = {};
+      if (title !== task.title) body.title = title;
+      if (description !== (task.description || "")) body.description = description || null;
+      if (listId !== task.list_id) body.list_id = listId;
+      if (due.due_at !== task.due_at || due.due_all_day !== task.due_all_day) {
+        // Сравниваем моменты, а не строки: сервер может вернуть другой формат.
+        const same =
+          due.due_all_day === task.due_all_day &&
+          ((!due.due_at && !task.due_at) || (due.due_at && task.due_at && +new Date(due.due_at) === +new Date(task.due_at)));
+        if (!same) Object.assign(body, due);
+      }
+      if (!Object.keys(body).length) return closeSheet(true);
+      body.version = task.version;
+      await api(`/tasks/${task.id}`, send("PATCH", body));
+      toast("Задача сохранена");
+    } else {
+      await api("/tasks", send("POST", { title, description: description || undefined, list_id: listId, ...due }), {
+        404: "Список не найден — возможно, его удалили.",
+      });
+      haptic("success");
+      toast("Задача создана");
+    }
+    await closeSheet(true);
+    await refreshListsAndTasks();
+  } catch (err) {
+    if (err.status === 409 || err.status === 404) await closeSheet(true);
+    handleError(err, refreshListsAndTasks);
+  }
 }
-$("#themeSwitch").onclick = () => {
-  document.body.classList.toggle("dark");
-  try {
-    localStorage.setItem(
-      "todo-theme",
-      document.body.classList.contains("dark") ? "dark" : "light",
-    );
-  } catch {}
-};
 
-// Интерфейс зависит от роли: администратору доступны все пользователи.
-function applyRole() {
-  document.querySelector('.nav button[data-page="users"]').hidden = !isAdmin();
-  $("#meName").textContent = state.me ? state.me.full_name : "";
+async function deleteTask(task) {
+  if (!(await ask("Удалить задачу?"))) return;
+  try {
+    await api(`/tasks/${task.id}`, send("DELETE"));
+    await closeSheet(true);
+    toast("Задача удалена");
+    await refreshListsAndTasks();
+  } catch (err) {
+    await closeSheet(true);
+    handleError(err, refreshListsAndTasks);
+  }
+}
+
+// ---------- Форма списка ----------
+function openListSheet(list = null) {
+  const color = list?.color || LIST_COLORS.find(c => !state.lists.some(l => l.color === c)) || "blue";
+  openSheet(
+    list ? "Список" : "Новый список",
+    `<form id="listForm" novalidate>
+      <input class="field" id="listTitle" maxlength="50" placeholder="Например, «Дом»" value="${esc(list?.title)}" aria-label="Название списка" />
+      <span class="field-label">Цвет</span>
+      <div class="palette" role="group" aria-label="Цвет списка">${LIST_COLORS.map(
+        c =>
+          `<button class="swatch" type="button" data-color="" data-value="${c}" aria-pressed="${c === color}" aria-label="${
+            COLOR_NAMES[c]
+          }" ${colorStyle(c)}></button>`,
+      ).join("")}</div>
+      <div class="sheet-actions">
+        <button class="btn primary block" type="submit">${list ? "Сохранить" : "Создать список"}</button>
+        ${
+          list && !list.is_default
+            ? `<button class="btn danger block" type="button" id="listDelete">Удалить список${
+                list.total_tasks ? ` и ${list.total_tasks} ${plural(list.total_tasks, "задачу", "задачи", "задач")}` : ""
+              }</button>`
+            : ""
+        }
+      </div>
+      ${list?.is_default ? '<p class="hint">Это список по умолчанию, его нельзя удалить.</p>' : ""}
+    </form>`,
+    { onSubmit: () => saveList(list) },
+  );
+  bindChoice("[data-color]");
+  if (list && !list.is_default) $("#listDelete").onclick = () => deleteList(list);
+}
+
+async function saveList(list) {
+  const title = $("#listTitle").value.trim();
+  const color = chosen("[data-color]");
+  if (!title) {
+    toast("Назовите список.", true);
+    $("#listTitle").focus();
+    return;
+  }
+  try {
+    if (list) {
+      await api(`/lists/${list.id}`, send("PATCH", { title, color, version: list.version }));
+      toast("Список сохранён");
+    } else {
+      const created = await api("/lists", send("POST", { title, color }));
+      state.listFilter = created.id;
+      toast("Список создан");
+    }
+    await closeSheet(true);
+    await afterListsChanged();
+  } catch (err) {
+    if (err.status === 409 || err.status === 404) await closeSheet(true);
+    handleError(err, afterListsChanged);
+  }
+}
+
+async function deleteList(list) {
+  const question = list.total_tasks
+    ? `Удалить список «${list.title}» и ${list.total_tasks} ${plural(list.total_tasks, "задачу", "задачи", "задач")} в нём?`
+    : `Удалить список «${list.title}»?`;
+  if (!(await ask(question))) return;
+  try {
+    await api(`/lists/${list.id}`, send("DELETE"), { 409: "Список по умолчанию удалить нельзя." });
+    if (state.listFilter === list.id) state.listFilter = "all";
+    await closeSheet(true);
+    toast("Список удалён");
+    await afterListsChanged();
+  } catch (err) {
+    await closeSheet(true);
+    handleError(err, afterListsChanged);
+  }
+}
+
+async function afterListsChanged() {
+  await loadLists();
+  if (state.tab === "tasks") await loadTasks();
+  else if (state.tab === "profile") renderProfile();
+}
+
+// ---------- Статистика ----------
+const PERIODS = { week: "Неделя", month: "Месяц", all: "Всё время" };
+async function loadStats() {
+  renderLoader();
+  const params = new URLSearchParams();
+  const userId = isAdmin() && state.statsUser ? state.statsUser : state.me.id;
+  params.set("user_id", userId);
+  if (state.statsPeriod !== "all") {
+    const days = state.statsPeriod === "week" ? 7 : 30;
+    const from = new Date();
+    from.setDate(from.getDate() - days + 1);
+    params.set("from", toDateInput(from));
+  }
+  try {
+    const [stats] = await Promise.all([
+      api(`/statistics?${params}`),
+      isAdmin() && !state.users.length ? loadUsersData() : null,
+    ]);
+    renderStats(stats);
+  } catch (e) {
+    renderError(e, loadStats);
+  }
+}
+
+function renderStats(s) {
+  const created = s.tasks_created || 0,
+    completed = s.tasks_completed || 0;
+  const onTime = s.tasks_on_time_rate == null ? "—" : `${Math.round(s.tasks_on_time_rate)}%`;
+  const lists = s.lists || [];
+  $("#screen").innerHTML = `
+    <div class="screen-head"><h1 class="title">Статистика</h1></div>
+    ${
+      isAdmin()
+        ? `<select class="field" id="statsUser" aria-label="Чья статистика" style="margin-bottom:10px">
+            <option value="">Моя</option>${state.users
+              .filter(u => u.id !== state.me.id)
+              .map(u => `<option value="${u.id}" ${String(u.id) === String(state.statsUser) ? "selected" : ""}>${esc(u.full_name)}</option>`)
+              .join("")}</select>`
+        : ""
+    }
+    <div class="segmented" role="group" aria-label="Период">${Object.entries(PERIODS)
+      .map(([k, v]) => `<button type="button" data-period="${k}" aria-pressed="${state.statsPeriod === k}">${v}</button>`)
+      .join("")}</div>
+    ${
+      created
+        ? `<div class="stat-grid">
+            <div class="card"><div class="stat-label">Выполнено</div><div class="stat-value">${completed}<small> из ${created}</small></div></div>
+            <div class="card"><div class="stat-label">В срок</div><div class="stat-value">${onTime}</div></div>
+            <div class="card wide"><div class="stat-label">Обычно задача занимает</div><div class="stat-value" style="font-size:20px">${fmtDuration(
+              s.tasks_average_completion_seconds,
+            )}</div></div>
+          </div>
+          ${
+            lists.length
+              ? `<div class="section-label">По спискам</div><div class="card">${lists
+                  .map(
+                    l => `<div class="bar-row" ${colorStyle(l.color)}>
+                      <div class="bar-head"><span class="dot"></span><span class="row-main">${esc(l.title)}</span><span class="row-sub">${
+                        l.tasks_completed
+                      } из ${l.tasks_created}</span></div>
+                      <div class="bar-track"><div class="bar-fill" style="width:${
+                        l.tasks_created ? Math.round((l.tasks_completed / l.tasks_created) * 100) : 0
+                      }%"></div></div></div>`,
+                  )
+                  .join("")}</div>`
+              : ""
+          }`
+        : `<div class="empty"><h2>Пока нечего считать</h2><p>За этот период задач не было.</p></div>`
+    }`;
+  document.querySelectorAll("[data-period]").forEach(b => {
+    b.onclick = () => {
+      state.statsPeriod = b.dataset.period;
+      loadStats();
+    };
+  });
+  if (isAdmin())
+    $("#statsUser").onchange = e => {
+      state.statsUser = e.target.value;
+      loadStats();
+    };
+}
+
+// ---------- Профиль ----------
+function avatarStyle(id, extra = "") {
+  const c = LIST_COLORS[id % LIST_COLORS.length];
+  return `style="--avatar-bg: color-mix(in srgb, var(--c-${c}) 18%, var(--surface)); --avatar-fg: var(--c-${c}); ${extra}"`;
+}
+
+async function renderProfile() {
+  renderLoader();
+  try {
+    await loadLists();
+  } catch (e) {
+    return renderError(e, renderProfile);
+  }
+  const me = state.me;
+  const dark = document.body.classList.contains("dark");
+  $("#screen").innerHTML = `
+    <div class="profile">
+      <div class="avatar" ${avatarStyle(me.id)} aria-hidden="true">${esc(initials(me.full_name))}</div>
+      <div class="row-main"><div class="profile-name">${esc(me.full_name)}</div><div class="row-sub">${esc(
+        me.phone_number || "Телефон не указан",
+      )}</div></div>
+      <button class="icon-btn" type="button" id="editProfile" aria-label="Изменить профиль">${icon("edit")}</button>
+    </div>
+
+    <div class="section-label">Мои списки</div>
+    <div class="rows">${state.lists
+      .map(
+        l => `<button class="row" type="button" data-edit-list="${l.id}" ${colorStyle(l.color)}>
+          <span class="dot" style="width:10px;height:10px"></span>
+          <span class="row-main">${esc(l.title)}</span>
+          <span class="row-sub">${l.open_tasks} ${plural(l.open_tasks, "задача", "задачи", "задач")}</span>
+          <span class="chev">${icon("chev", 18)}</span></button>`,
+      )
+      .join("")}
+      <button class="row" type="button" id="newListRow"><span class="row-main">${icon("plus", 18)} Новый список</span></button>
+    </div>
+
+    ${
+      inTelegram
+        ? ""
+        : `<div class="section-label">Оформление</div>
+          <div class="rows"><div class="row"><span class="row-main">Тёмная тема</span>
+          <button class="switch" type="button" role="switch" id="themeSwitch" aria-checked="${dark}" aria-label="Тёмная тема"></button></div></div>`
+    }
+
+    ${
+      isAdmin()
+        ? `<div class="section-label">Администрирование</div>
+          <div class="rows"><button class="row" type="button" id="usersRow">${icon("users", 18)}<span class="row-main">Все пользователи</span><span class="chev">${icon(
+            "chev",
+            18,
+          )}</span></button></div>`
+        : ""
+    }`;
+
+  $("#editProfile").onclick = () => openUserSheet(me, { self: true });
+  document.querySelectorAll("[data-edit-list]").forEach(b => {
+    b.onclick = () => openListSheet(listById(Number(b.dataset.editList)));
+  });
+  $("#newListRow").onclick = () => openListSheet();
+  if (!inTelegram)
+    $("#themeSwitch").onclick = () => {
+      const on = !document.body.classList.contains("dark");
+      document.body.classList.toggle("dark", on);
+      try {
+        localStorage.setItem("todo-theme", on ? "dark" : "light");
+      } catch {}
+      $("#themeSwitch").setAttribute("aria-checked", String(on));
+    };
+  if (isAdmin()) $("#usersRow").onclick = () => switchTab("users");
+}
+
+// ---------- Пользователь (свой профиль и админка) ----------
+function openUserSheet(user, { self = false } = {}) {
+  openSheet(
+    self ? "Профиль" : "Пользователь",
+    `<form id="userForm" novalidate>
+      <label class="field-label" for="userName" style="margin-top:4px">Имя</label>
+      <input class="field" id="userName" maxlength="100" value="${esc(user.full_name)}" />
+      <label class="field-label" for="userPhone">Телефон</label>
+      <input class="field" id="userPhone" type="tel" inputmode="tel" maxlength="15" placeholder="+79991234567" value="${esc(
+        user.phone_number,
+      )}" />
+      <p class="hint">Необязательно. Плюс и от 9 до 14 цифр.</p>
+      <div class="sheet-actions">
+        <button class="btn primary block" type="submit">Сохранить</button>
+        ${!self && user.id !== state.me.id ? '<button class="btn danger block" type="button" id="userDelete">Удалить пользователя</button>' : ""}
+      </div>
+    </form>`,
+    { onSubmit: () => saveUser(user, self) },
+  );
+  if (!self && user.id !== state.me.id) $("#userDelete").onclick = () => deleteUser(user);
+}
+
+async function saveUser(user, self) {
+  const full_name = $("#userName").value.trim();
+  const phone = $("#userPhone").value.trim();
+  if (!full_name) {
+    toast("Укажите имя.", true);
+    return;
+  }
+  if (phone && !/^\+[0-9]{9,14}$/.test(phone)) {
+    toast("Телефон: плюс и от 9 до 14 цифр, например +79991234567.", true);
+    return;
+  }
+  const body = {};
+  if (full_name !== user.full_name) body.full_name = full_name;
+  // Пустое поле — удалить телефон: отправляем null, а не "".
+  if (phone !== (user.phone_number || "")) body.phone_number = phone || null;
+  if (!Object.keys(body).length) return closeSheet(true);
+  body.version = user.version;
+  try {
+    const updated = await api(`/users/${user.id}`, send("PATCH", body));
+    if (updated.id === state.me.id) state.me = { ...state.me, ...updated };
+    await closeSheet(true);
+    toast("Сохранено");
+    if (self) renderProfile();
+    else loadUsers();
+  } catch (err) {
+    await closeSheet(true);
+    handleError(err, self ? refreshMe : loadUsers);
+  }
+}
+
+async function refreshMe() {
+  state.me = await api("/me");
+  renderProfile();
+}
+
+async function loadUsersData() {
+  const users = await api("/users?limit=500&offset=0");
+  state.users = Array.isArray(users) ? users : [];
+}
+
+async function loadUsers() {
+  renderLoader();
+  try {
+    await loadUsersData();
+  } catch (e) {
+    return renderError(e, loadUsers);
+  }
+  $("#screen").innerHTML = `
+    <div class="screen-head">
+      ${inTelegram ? "" : `<button class="icon-btn" type="button" id="usersBack" aria-label="Назад">${icon("back")}</button>`}
+      <h1 class="title">Пользователи</h1>
+    </div>
+    <div class="rows">${state.users
+      .map(
+        u => `<button class="row" type="button" data-user="${u.id}">
+          <div class="avatar" ${avatarStyle(u.id, "width:36px;height:36px;font-size:13px")} aria-hidden="true">${esc(initials(u.full_name))}</div>
+          <span class="row-main">${esc(u.full_name)}<div class="row-sub">${u.telegram_id ? "Telegram" : "без Telegram"}${
+            u.phone_number ? `, ${esc(u.phone_number)}` : ""
+          }</div></span>
+          <span class="chev">${icon("chev", 18)}</span></button>`,
+      )
+      .join("")}</div>`;
+  if (!inTelegram) $("#usersBack").onclick = () => switchTab("profile");
+  document.querySelectorAll("[data-user]").forEach(b => {
+    b.onclick = () => openUserSheet(state.users.find(u => u.id === Number(b.dataset.user)));
+  });
+}
+
+async function deleteUser(user) {
+  if (!(await ask(`Удалить пользователя «${user.full_name}»?`))) return;
+  try {
+    await api(`/users/${user.id}`, send("DELETE"), {
+      409: "У пользователя есть задачи — сначала удалите их.",
+    });
+    await closeSheet(true);
+    toast("Пользователь удалён");
+    loadUsers();
+  } catch (err) {
+    await closeSheet(true);
+    handleError(err, loadUsers);
+  }
+}
+
+// ---------- Тема и Telegram ----------
+function applyTheme() {
+  if (inTelegram) {
+    document.body.classList.toggle("dark", tg.colorScheme === "dark");
+  } else {
+    let saved = null;
+    try {
+      saved = localStorage.getItem("todo-theme");
+    } catch {}
+    const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+    document.body.classList.toggle("dark", saved === "dark" || (!saved && prefersDark));
+  }
+  if (inTelegram) syncTelegramColors();
+}
+
+// Шапка, фон и системная кнопка Telegram в цветах приложения.
+function syncTelegramColors() {
+  const css = getComputedStyle(document.body);
+  const bg = css.getPropertyValue("--bg").trim();
+  const ink = css.getPropertyValue("--ink").trim();
+  const onInk = css.getPropertyValue("--on-ink").trim();
+  if (tg.isVersionAtLeast?.("6.1")) {
+    tg.setHeaderColor(bg);
+    tg.setBackgroundColor(bg);
+  }
+  if (tg.isVersionAtLeast?.("7.10")) tg.setBottomBarColor?.(bg);
+  tg.MainButton.setParams({ text: "Добавить задачу", color: ink, text_color: onInk });
 }
 
 async function start() {
+  $("#addTaskBtn").innerHTML = `${icon("plus", 18)} Добавить задачу`;
+  $("#addTaskBtn").onclick = () => openTaskSheet();
   if (tg) {
     tg.ready();
     tg.expand();
-    tg.onEvent("themeChanged", applyTheme);
-    tg.BackButton.onClick(closeModal);
-    if (inTelegram) $(".theme-box").hidden = true;
+    if (inTelegram) {
+      tg.onEvent("themeChanged", applyTheme);
+      tg.BackButton.onClick(() => (isSheetOpen() ? closeSheet() : switchTab("profile")));
+      tg.MainButton.onClick(() => openTaskSheet());
+    }
   }
   applyTheme();
-  setActive();
-  renderShell("Загрузка", "");
+  renderTabbar();
   renderLoader();
   try {
     state.me = await api("/me");
   } catch (e) {
-    renderShell("TodoApp", "");
+    $("#tabbar").hidden = true;
     renderError(
       e.status === 401
-        ? new Error("Откройте приложение через Telegram-бота. Вне Telegram интерфейс доступен только на локальном адресе.")
+        ? new Error("Откройте приложение кнопкой в Telegram-боте. Вне Telegram оно доступно только на компьютере, где запущен сервер.")
         : e,
+      e.status === 401 ? null : start,
     );
     return;
   }
-  applyRole();
-  loadTasks();
+  $("#tabbar").hidden = false;
+  switchTab("tasks");
 }
 start();
