@@ -197,4 +197,9 @@ internal/features    users, tasks, statistics, web: transport → service → re
 migrations           SQL-миграции (golang-migrate)
 public               фронтенд (index.html + assets/app.css, assets/app.js), встраивается через go:embed
 docs                 сгенерированная Swagger-спецификация
+CLAUDE.md            соглашения проекта для Claude Code: слои, права, миграции, время, сервер
 ```
+
+## Разработка
+
+Работа идёт через ветку и PR, в `main` напрямую не коммитим. Перед PR: `make vet test lint` и сборка образа `docker build -f cmd/todoapp/Dockerfile .` — то же проверяет CI. Соглашения, которые не видны из кода (права доступа, миграции, часовые пояса, сервер), собраны в [CLAUDE.md](CLAUDE.md).
