@@ -320,9 +320,19 @@ function taskCard(t) {
           ? `<span class="tag">${esc(memberName(list, t.author_user_id) || "участник")}</span>`
           : ""
       }</div>
+      ${checklistProgress(t, list)}
     </div>
     ${showDot ? `<span class="dot" ${colorStyle(list.color)} title="${esc(list.title)}"></span>` : ""}
   </article>`;
+}
+
+// Прогресс чеклиста на карточке: «3/7» и полоска цвета списка.
+function checklistProgress(t, list) {
+  if (!t.items_total) return "";
+  const pct = Math.round((t.items_done / t.items_total) * 100);
+  return `<div class="progress" ${list ? colorStyle(list.color) : ""} aria-label="Пункты: ${t.items_done} из ${t.items_total}">
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <span class="progress-count">${t.items_done}/${t.items_total}</span></div>`;
 }
 
 function renderTasks() {
@@ -423,6 +433,11 @@ async function closeSheet(force = false) {
   if (!isSheetOpen()) return;
   if (!force && sheetDirty && !(await ask("Закрыть без сохранения?"))) return;
   setDirty(false);
+  // Пункты сохраняются сразу, поэтому после листа с изменённым чеклистом
+  // обновляем карточки: на них счётчик «3/7».
+  const checklistChanged = checklist?.changed;
+  checklist = null;
+  if (checklistChanged) loadTasks();
   $("#sheetBackdrop").classList.remove("open");
   document.body.style.overflow = "";
   updateAddButton();
@@ -497,6 +512,9 @@ function openTaskSheet(task = null) {
       <textarea class="field" id="taskDesc" maxlength="1000" placeholder="Подробности, если нужны" aria-label="Описание" style="margin-top:8px">${esc(
         task?.description,
       )}</textarea>
+
+      <span class="field-label">Чеклист</span>
+      <div class="checklist" id="checklist"></div>
 
       <span class="field-label">Срок</span>
       <div class="chips wrap">${dueChip("none", "Без срока")}${dueChip("today", "Сегодня")}${dueChip(
@@ -610,6 +628,7 @@ function openTaskSheet(task = null) {
     };
   });
   bindChoice("[data-tlist]");
+  initChecklist(task);
   if (task) {
     $("#taskToggle").onclick = async () => {
       await closeSheet(true);
@@ -686,9 +705,10 @@ async function saveTask(task) {
       await api(`/tasks/${task.id}`, send("PATCH", body));
       toast("Задача сохранена");
     } else {
-      await api("/tasks", send("POST", { title, description: description || undefined, list_id: listId, ...due, repeat, remind_before_minutes: remind }), {
+      const created = await api("/tasks", send("POST", { title, description: description || undefined, list_id: listId, ...due, repeat, remind_before_minutes: remind }), {
         404: "Список не найден — возможно, его удалили.",
       });
+      await savePendingItems(created.id);
       haptic("success");
       toast("Задача создана");
     }
@@ -697,6 +717,192 @@ async function saveTask(task) {
   } catch (err) {
     if (err.status === 409 || err.status === 404) await closeSheet(true);
     handleError(err, refreshListsAndTasks);
+  }
+}
+
+// ---------- Чеклист ----------
+// У существующей задачи пункты сохраняются сразу, у новой — копятся в форме
+// и отправляются после создания задачи.
+let checklist = null;
+const HIDE_DONE_KEY = "todo-hide-done-items";
+
+function readHideDone() {
+  try {
+    return localStorage.getItem(HIDE_DONE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+async function initChecklist(task) {
+  const box = $("#checklist");
+  checklist = { task, items: [], hideDone: readHideDone(), changed: false, offered: false };
+  // Ввод пункта не делает форму задачи «несохранённой».
+  box.addEventListener("input", e => e.stopPropagation());
+  if (task) {
+    box.innerHTML = '<p class="hint">Загружаем пункты…</p>';
+    try {
+      const items = (await api(`/tasks/${task.id}/items`)) || [];
+      if (checklist?.task !== task) return;
+      checklist.items = items;
+      // Уже всё отмечено — не предлагаем выполнить, пока что-то не изменится.
+      checklist.offered = items.length > 0 && items.every(i => i.done);
+    } catch (err) {
+      if (checklist?.task === task) box.innerHTML = `<p class="hint">${esc(err.message)}</p>`;
+      return;
+    }
+  }
+  renderChecklist();
+}
+
+function renderChecklist() {
+  const box = $("#checklist");
+  if (!box || !checklist) return;
+  const { items, hideDone } = checklist;
+  const done = items.filter(i => i.done).length;
+  const visible = hideDone ? items.filter(i => !i.done) : items;
+  box.innerHTML = `${visible
+    .map(
+      i => `<div class="check-item${i.done ? " done" : ""}">
+        <button class="task-check" type="button" data-item-check="${i.id}" aria-pressed="${i.done}" aria-label="${
+          i.done ? "Снять отметку" : "Отметить"
+        }: ${esc(i.title)}">${i.done ? icon("check", 14) : ""}</button>
+        <span class="check-title">${esc(i.title)}</span>
+        <button class="icon-btn" type="button" data-item-delete="${i.id}" aria-label="Удалить пункт: ${esc(i.title)}">${icon("close", 16)}</button>
+      </div>`,
+    )
+    .join("")}
+    <div class="inline check-add">
+      <input class="field" id="itemTitle" maxlength="200" placeholder="Добавить пункт" aria-label="Новый пункт" />
+      <button class="btn quiet" type="button" id="itemAdd" aria-label="Добавить пункт">${icon("plus", 18)}</button>
+    </div>
+    ${
+      done
+        ? `<button class="btn quiet block check-hide" type="button" id="itemsHideDone" aria-pressed="${hideDone}">${
+            hideDone ? `Показать отмеченные (${done})` : "Скрыть отмеченные"
+          }</button>`
+        : ""
+    }`;
+
+  box.querySelectorAll("[data-item-check]").forEach(b => (b.onclick = () => toggleItem(Number(b.dataset.itemCheck))));
+  box.querySelectorAll("[data-item-delete]").forEach(b => (b.onclick = () => deleteItem(Number(b.dataset.itemDelete))));
+  $("#itemAdd").onclick = () => addItem();
+  $("#itemTitle").addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    addItem();
+  });
+  if (done) {
+    $("#itemsHideDone").onclick = () => {
+      checklist.hideDone = !checklist.hideDone;
+      try {
+        localStorage.setItem(HIDE_DONE_KEY, checklist.hideDone ? "1" : "0");
+      } catch {
+        /* без памяти — только до закрытия */
+      }
+      renderChecklist();
+    };
+  }
+}
+
+// На 409/404 перечитываем пункты; если пропала сама задача — закрываем лист.
+async function checklistError(err) {
+  toast(err.message, true);
+  if (err.status !== 409 && err.status !== 404) return;
+  const task = checklist?.task;
+  try {
+    const items = (await api(`/tasks/${task.id}/items`)) || [];
+    if (checklist?.task !== task) return;
+    checklist.items = items;
+    renderChecklist();
+  } catch (e) {
+    if (e.status === 404) {
+      await closeSheet(true);
+      await refreshListsAndTasks();
+    }
+  }
+}
+
+async function addItem() {
+  const input = $("#itemTitle");
+  const title = input.value.trim();
+  if (!title) return input.focus();
+  const { task } = checklist;
+  if (!task) {
+    checklist.items.push({ id: -(checklist.items.length + 1), title, done: false });
+    setDirty(true);
+  } else {
+    try {
+      const item = await api(`/tasks/${task.id}/items`, send("POST", { title }), { 409: "В задаче уже 100 пунктов." });
+      if (checklist?.task !== task) return;
+      checklist.items.push(item);
+      checklist.changed = true;
+      checklist.offered = false;
+    } catch (err) {
+      return checklistError(err);
+    }
+  }
+  renderChecklist();
+  $("#itemTitle").focus();
+}
+
+async function toggleItem(id) {
+  const item = checklist.items.find(i => i.id === id);
+  if (!item) return;
+  const { task } = checklist;
+  if (!task) {
+    item.done = !item.done;
+    return renderChecklist();
+  }
+  try {
+    const updated = await api(`/tasks/${task.id}/items/${id}`, send("PATCH", { done: !item.done, version: item.version }));
+    if (checklist?.task !== task) return;
+    Object.assign(item, updated);
+    checklist.changed = true;
+    renderChecklist();
+    offerComplete();
+  } catch (err) {
+    checklistError(err);
+  }
+}
+
+async function deleteItem(id) {
+  const { task } = checklist;
+  if (task) {
+    try {
+      await api(`/tasks/${task.id}/items/${id}`, send("DELETE"));
+    } catch (err) {
+      return checklistError(err);
+    }
+    if (checklist?.task !== task) return;
+    checklist.changed = true;
+  }
+  checklist.items = checklist.items.filter(i => i.id !== id);
+  renderChecklist();
+  offerComplete();
+}
+
+// Все пункты отмечены — предлагаем выполнить задачу, но сами не закрываем.
+async function offerComplete() {
+  const { task, items } = checklist;
+  const allDone = items.length > 0 && items.every(i => i.done);
+  if (!allDone) {
+    checklist.offered = false;
+    return;
+  }
+  if (!task || task.completed || checklist.offered) return;
+  checklist.offered = true;
+  haptic("success");
+  if (!(await ask("Все пункты отмечены. Выполнить задачу?"))) return;
+  await closeSheet();
+  if (!isSheetOpen()) toggleTask(task.id);
+}
+
+// Пункты новой задачи — после её создания, по порядку.
+async function savePendingItems(taskId) {
+  for (const i of checklist?.items || []) {
+    const item = await api(`/tasks/${taskId}/items`, send("POST", { title: i.title }));
+    if (i.done) await api(`/tasks/${taskId}/items/${item.id}`, send("PATCH", { done: true, version: item.version }));
   }
 }
 
@@ -729,8 +935,16 @@ function membersBlock(list) {
       }</div>`;
     })
     .join("");
+  // Переключатель у каждого свой: и у владельца, и у участников.
+  const notify = isShared(list)
+    ? `<div class="rows" style="background:var(--field);margin-top:8px"><div class="row">
+        <span class="row-main">Сообщать об изменениях<div class="row-sub">когда другие добавляют или выполняют задачи</div></span>
+        <button class="switch" type="button" role="switch" id="notifySwitch" aria-checked="${list.notify_changes !== false}" aria-label="Сообщать об изменениях"></button>
+      </div></div>`
+    : "";
   return `<span class="field-label">Участники</span>
     <div class="rows" style="background:var(--field)">${rows}</div>
+    ${notify}
     ${owner ? '<div id="inviteBlock" style="margin-top:8px"></div>' : ""}`;
 }
 
@@ -798,6 +1012,25 @@ function openListSheet(list = null) {
     });
   }
   if (!owner) $("#listLeave").onclick = () => leaveList(list);
+  if ($("#notifySwitch")) $("#notifySwitch").onclick = () => toggleListNotify(list);
+}
+
+async function toggleListNotify(list) {
+  const on = list.notify_changes === false;
+  if (on && !(await requestWriteAccess())) {
+    toast("Без разрешения бот не сможет присылать сообщения.", true);
+    return;
+  }
+  const sw = $("#notifySwitch");
+  sw.setAttribute("aria-checked", String(on));
+  try {
+    await api(`/lists/${list.id}/notifications`, send("PUT", { notify_changes: on }));
+    list.notify_changes = on;
+    toast(on ? "Бот напишет, когда в списке что-то изменится" : "Сообщения об изменениях выключены");
+  } catch (err) {
+    sw.setAttribute("aria-checked", String(!on));
+    toast(err.message, true);
+  }
 }
 
 async function createInvite(list) {
@@ -1318,8 +1551,23 @@ async function start() {
   $("#tabbar").hidden = false;
   await syncTimezone();
   await joinFromLink();
+  await openListFromLink();
   await switchTab("tasks");
   await openTaskFromLink();
+}
+
+// Кнопка «Открыть список» в сообщении об изменениях ведёт на t.me/<бот>?startapp=list_<id>.
+async function openListFromLink() {
+  const param = (inTelegram ? tg.initDataUnsafe?.start_param : null) || "";
+  const id = param.startsWith("list_") ? Number(param.slice(5)) : Number(new URLSearchParams(location.search).get("list"));
+  if (!id) return;
+  try {
+    await loadLists();
+  } catch {
+    return;
+  }
+  if (listById(id)) state.listFilter = id;
+  else toast("Список не найден — возможно, вас из него исключили.", true);
 }
 
 // Кнопка «Открыть задачу» в напоминании ведёт на t.me/<бот>?startapp=task_<id>.

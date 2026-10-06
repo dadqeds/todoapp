@@ -17,12 +17,14 @@ func (r *ListsRepository) GetListsForUser(ctx context.Context, userID int) ([]do
 	query := `
 	SELECT l.id, l.version, l.title, l.color, l.owner_user_id, l.is_default, l.created_at, l.invite_code,
 		COUNT(t.id) FILTER (WHERE NOT t.completed),
-		COUNT(t.id)
+		COUNT(t.id),
+		CASE WHEN l.owner_user_id = $1 THEN l.owner_notify_changes ELSE COALESCE(m.notify_changes, FALSE) END
 	FROM todoapp.lists l
+	LEFT JOIN todoapp.list_members m ON m.list_id = l.id AND m.user_id = $1
 	LEFT JOIN todoapp.tasks t ON t.list_id = l.id
 	WHERE l.owner_user_id = $1
 		OR l.id IN (SELECT list_id FROM todoapp.list_members WHERE user_id = $1)
-	GROUP BY l.id
+	GROUP BY l.id, m.notify_changes
 	ORDER BY l.is_default DESC, (l.owner_user_id = $1) DESC, l.id ASC;
 	`
 
@@ -40,8 +42,9 @@ func (r *ListsRepository) GetListsForUser(ctx context.Context, userID int) ([]do
 		var (
 			m           ListModel
 			open, total int
+			notify      bool
 		)
-		if err := rows.Scan(append(listScanTargets(&m), &open, &total)...); err != nil {
+		if err := rows.Scan(append(listScanTargets(&m), &open, &total, &notify)...); err != nil {
 			return nil, fmt.Errorf("scan lists: %w", err)
 		}
 
@@ -50,7 +53,7 @@ func (r *ListsRepository) GetListsForUser(ctx context.Context, userID int) ([]do
 			role = domain.ListRoleOwner
 		}
 
-		lists = append(lists, domain.ListSummary{List: listDomainFromModel(m), OpenTasks: open, TotalTasks: total, Role: role})
+		lists = append(lists, domain.ListSummary{List: listDomainFromModel(m), OpenTasks: open, TotalTasks: total, Role: role, NotifyChanges: notify})
 		ids = append(ids, m.ID)
 	}
 	if err := rows.Err(); err != nil {

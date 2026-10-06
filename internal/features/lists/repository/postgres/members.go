@@ -93,3 +93,34 @@ func (r *ListsRepository) GetListByInviteCode(ctx context.Context, code string) 
 
 	return listDomainFromModel(m), nil
 }
+
+// SetNotifyChanges включает или выключает уведомления об изменениях в списке
+// для пользователя: у владельца флаг хранится в самом списке, у участника — в
+// list_members. Не владелец и не участник — ErrNotFound.
+func (r *ListsRepository) SetNotifyChanges(ctx context.Context, listID int, userID int, enabled bool) error {
+	ctx, cancel := context.WithTimeout(ctx, r.pool.OpTimeout())
+	defer cancel()
+
+	query := `
+	WITH owner AS (
+		UPDATE todoapp.lists SET owner_notify_changes = $3
+		WHERE id = $1 AND owner_user_id = $2
+		RETURNING id
+	), member AS (
+		UPDATE todoapp.list_members SET notify_changes = $3
+		WHERE list_id = $1 AND user_id = $2
+		RETURNING list_id
+	)
+	SELECT (SELECT COUNT(*) FROM owner) + (SELECT COUNT(*) FROM member);
+	`
+
+	var updated int
+	if err := r.pool.QueryRow(ctx, query, listID, userID, enabled).Scan(&updated); err != nil {
+		return fmt.Errorf("update notify changes: %w", err)
+	}
+	if updated == 0 {
+		return fmt.Errorf("user with id='%d' in list with id='%d': %w", userID, listID, core_errors.ErrNotFound)
+	}
+
+	return nil
+}

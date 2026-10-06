@@ -62,3 +62,17 @@ func TestGetTasksReturnsEmptyArray(t *testing.T) {
 		t.Fatalf("code = %d, body = %q", rec.Code, rec.Body.String())
 	}
 }
+
+func (f fakeTasksService) GetTaskItems(context.Context, int) ([]domain.TaskItem, error) {
+	return nil, nil
+}
+
+func TestGetTaskItemsReturnsEmptyArray(t *testing.T) {
+	h := NewTasksHTTPHandler(fakeTasksService{})
+
+	rec := serve(h.GetTaskItems, http.MethodGet, "/tasks/{id}/items", "/tasks/1/items")
+
+	if rec.Code != http.StatusOK || rec.Body.String() != "[]\n" {
+		t.Fatalf("code = %d, body = %q", rec.Code, rec.Body.String())
+	}
+}

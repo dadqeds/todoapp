@@ -40,6 +40,11 @@ type TasksService interface {
 		id int,
 		patch domain.TaskPatch,
 	) (domain.Task, error)
+
+	GetTaskItems(ctx context.Context, taskID int) ([]domain.TaskItem, error)
+	CreateTaskItem(ctx context.Context, taskID int, title string) (domain.TaskItem, error)
+	PatchTaskItem(ctx context.Context, taskID int, itemID int, patch domain.TaskItemPatch) (domain.TaskItem, error)
+	DeleteTaskItem(ctx context.Context, taskID int, itemID int) error
 }
 
 func NewTasksHTTPHandler(
@@ -77,5 +82,9 @@ func (h *TasksHTTPHandler) Routes() []core_http_server.Route {
 			Path:    "/tasks/{id}",
 			Handler: h.PatchTask,
 		},
+		{Method: http.MethodGet, Path: "/tasks/{id}/items", Handler: h.GetTaskItems},
+		{Method: http.MethodPost, Path: "/tasks/{id}/items", Handler: h.CreateTaskItem},
+		{Method: http.MethodPatch, Path: "/tasks/{id}/items/{item_id}", Handler: h.PatchTaskItem},
+		{Method: http.MethodDelete, Path: "/tasks/{id}/items/{item_id}", Handler: h.DeleteTaskItem},
 	}
 }

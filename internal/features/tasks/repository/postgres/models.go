@@ -6,7 +6,11 @@ import (
 	"github.com/dadqeds/todoapp/internal/core/domain"
 )
 
-const taskColumns = `id, version, title, description, completed, created_at, completed_at, author_user_id, list_id, due_at, due_all_day, repeat_rule, remind_before_minutes, reminded_at`
+// Последние два столбца — счётчики пунктов чеклиста; запросы обращаются к
+// таблице задач по имени tasks, без псевдонима.
+const taskColumns = `id, version, title, description, completed, created_at, completed_at, author_user_id, list_id, due_at, due_all_day, repeat_rule, remind_before_minutes, reminded_at,
+	(SELECT COUNT(*) FROM todoapp.task_items i WHERE i.task_id = tasks.id),
+	(SELECT COUNT(*) FROM todoapp.task_items i WHERE i.task_id = tasks.id AND i.done)`
 
 type TaskModel struct {
 	ID           int
@@ -23,6 +27,8 @@ type TaskModel struct {
 	RepeatRule   *string
 	RemindBefore *int
 	RemindedAt   *time.Time
+	ItemsTotal   int
+	ItemsDone    int
 }
 
 // scanner покрывает и core_postgres_pool.Row, и core_postgres_pool.Rows.
@@ -48,6 +54,8 @@ func scanTaskModel(s scanner) (TaskModel, error) {
 		&taskModel.RepeatRule,
 		&taskModel.RemindBefore,
 		&taskModel.RemindedAt,
+		&taskModel.ItemsTotal,
+		&taskModel.ItemsDone,
 	)
 
 	return taskModel, err
@@ -78,6 +86,8 @@ func taskDomainFromModel(taskModel TaskModel) domain.Task {
 
 	task.RemindBeforeMinutes = taskModel.RemindBefore
 	task.RemindedAt = taskModel.RemindedAt
+	task.ItemsTotal = taskModel.ItemsTotal
+	task.ItemsDone = taskModel.ItemsDone
 
 	return task
 }

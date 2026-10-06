@@ -491,6 +491,64 @@ const docTemplate = `{
                 }
             }
         },
+        "/lists/{id}/notifications": {
+            "put": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Личный переключатель владельца или участника: бот пишет, когда другие добавляют или выполняют задачи. По умолчанию включён",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "lists"
+                ],
+                "summary": "Сообщать об изменениях в списке",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID списка",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Включить или выключить",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_lists_transport_http.SetNotifyChangesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Сохранено"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/me": {
             "get": {
                 "security": [
@@ -865,6 +923,280 @@ const docTemplate = `{
                         "description": "Успешно изменённая задача",
                         "schema": {
                             "$ref": "#/definitions/internal_features_tasks_transport_http.PatchTaskResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/tasks/{id}/items": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Пункты задачи по порядку. Доступ — как у задачи",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Чеклист задачи",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID задачи",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_features_tasks_transport_http.TaskItemDTOResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Пункт встаёт в конец чеклиста. У задачи не больше 100 пунктов (409)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Добавить пункт",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID задачи",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Новый пункт",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.CreateTaskItemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.TaskItemDTOResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Слишком много пунктов",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/tasks/{id}/items/{item_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Удалить пункт",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID задачи",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID пункта",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Пункт удалён"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет или неверные данные Telegram",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "description": "Текст и отметка. Необязательное поле 'version' защищает от одновременного изменения (409)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Изменить пункт",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID задачи",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID пункта",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Изменения",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.PatchTaskItemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_features_tasks_transport_http.TaskItemDTOResponse"
                         }
                     },
                     "400": {
@@ -1402,6 +1734,11 @@ const docTemplate = `{
                         "$ref": "#/definitions/internal_features_lists_transport_http.ListMemberDTO"
                     }
                 },
+                "notify_changes": {
+                    "description": "Сообщать ли текущему пользователю об изменениях в этом списке.",
+                    "type": "boolean",
+                    "example": true
+                },
                 "open_tasks": {
                     "type": "integer",
                     "example": 3
@@ -1446,6 +1783,18 @@ const docTemplate = `{
                 "version": {
                     "type": "integer",
                     "example": 1
+                }
+            }
+        },
+        "internal_features_lists_transport_http.SetNotifyChangesRequest": {
+            "type": "object",
+            "required": [
+                "notify_changes"
+            ],
+            "properties": {
+                "notify_changes": {
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },
@@ -1515,6 +1864,20 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "example": "Дом"
+                }
+            }
+        },
+        "internal_features_tasks_transport_http.CreateTaskItemRequest": {
+            "type": "object",
+            "required": [
+                "title"
+            ],
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "example": "Молоко"
                 }
             }
         },
@@ -1599,6 +1962,15 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "items_done": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "items_total": {
+                    "description": "Пункты чеклиста: всего и отмеченных.",
+                    "type": "integer",
+                    "example": 7
+                },
                 "list_id": {
                     "type": "integer"
                 },
@@ -1645,6 +2017,15 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "items_done": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "items_total": {
+                    "description": "Пункты чеклиста: всего и отмеченных.",
+                    "type": "integer",
+                    "example": 7
+                },
                 "list_id": {
                     "type": "integer"
                 },
@@ -1661,6 +2042,23 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "internal_features_tasks_transport_http.PatchTaskItemRequest": {
+            "type": "object",
+            "properties": {
+                "done": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Молоко 3.2%"
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },
@@ -1738,6 +2136,15 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "items_done": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "items_total": {
+                    "description": "Пункты чеклиста: всего и отмеченных.",
+                    "type": "integer",
+                    "example": 7
+                },
                 "list_id": {
                     "type": "integer"
                 },
@@ -1809,6 +2216,15 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "items_done": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "items_total": {
+                    "description": "Пункты чеклиста: всего и отмеченных.",
+                    "type": "integer",
+                    "example": 7
+                },
                 "list_id": {
                     "type": "integer"
                 },
@@ -1825,6 +2241,38 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "internal_features_tasks_transport_http.TaskItemDTOResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "done": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "position": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "task_id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Молоко"
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },

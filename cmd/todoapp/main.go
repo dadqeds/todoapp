@@ -103,9 +103,13 @@ func run() error {
 	listsService := lists_service.NewListsService(listsRepository)
 	listsTransportHTTP := lists_transport_http.NewListsHTTPHandler(listsService, authConfig.TelegramBotUsername)
 
+	// Очередь уведомлений пополняется и без токена бота: включат бота —
+	// отправятся свежие изменения, старше суток очередь чистит сама.
+	notificationsRepository := notifications_postgres_repository.NewNotificationsRepository(pool)
+
 	logger.Debug("initializing feature", zap.String("feature", "tasks"))
 	tasksRepository := tasks_postgres_repository.NewTasksRepository(pool)
-	tasksService := tasks_service.NewTasksService(tasksRepository, listsRepository)
+	tasksService := tasks_service.NewTasksService(tasksRepository, listsRepository, notificationsRepository)
 	tasksTransportHTTP := tasks_transport_http.NewTasksHTTPHandler(tasksService)
 
 	logger.Debug("initializing feature", zap.String("feature", "statistics"))
@@ -171,10 +175,10 @@ func run() error {
 		servers = append(servers, newServer(localConfig, core_http_middleware.LocalAuth(authConfig.LocalTelegramID, usersService)))
 	}
 
-	// Напоминания и утренняя сводка: без токена бота писать некому.
+	// Напоминания, утренняя сводка и изменения в общих списках: без токена бота писать некому.
 	if authConfig.TelegramBotToken != "" {
 		notifier := notifications_service.NewNotifier(
-			notifications_postgres_repository.NewNotificationsRepository(pool),
+			notificationsRepository,
 			core_telegram.NewClient(authConfig.TelegramAPIURL, authConfig.TelegramBotToken),
 			authConfig.TelegramBotUsername,
 			logger.With(zap.String("component", "notifier")),

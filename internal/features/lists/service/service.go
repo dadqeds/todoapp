@@ -23,6 +23,7 @@ type ListsRepository interface {
 	RemoveMember(ctx context.Context, listID int, userID int) error
 	SetInviteCode(ctx context.Context, listID int, code *string) (domain.List, error)
 	GetListByInviteCode(ctx context.Context, code string) (domain.List, error)
+	SetNotifyChanges(ctx context.Context, listID int, userID int, enabled bool) error
 }
 
 func NewListsService(listsRepository ListsRepository) *ListsService {

@@ -24,6 +24,7 @@ type ListsService interface {
 	RevokeInvite(ctx context.Context, listID int) error
 	JoinList(ctx context.Context, code string) (domain.List, error)
 	RemoveMember(ctx context.Context, listID int, userID int) error
+	SetNotifyChanges(ctx context.Context, listID int, enabled bool) error
 }
 
 // botUsername нужен для ссылок-приглашений; пустой — ссылка не формируется.
@@ -44,5 +45,6 @@ func (h *ListsHTTPHandler) Routes() []core_http_server.Route {
 		{Method: http.MethodPost, Path: "/lists/{id}/invite", Handler: h.CreateInvite},
 		{Method: http.MethodDelete, Path: "/lists/{id}/invite", Handler: h.RevokeInvite},
 		{Method: http.MethodDelete, Path: "/lists/{id}/members/{user_id}", Handler: h.RemoveMember},
+		{Method: http.MethodPut, Path: "/lists/{id}/notifications", Handler: h.SetNotifyChanges},
 	}
 }

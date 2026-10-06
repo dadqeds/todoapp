@@ -134,6 +134,10 @@ definitions:
         items:
           $ref: '#/definitions/internal_features_lists_transport_http.ListMemberDTO'
         type: array
+      notify_changes:
+        description: Сообщать ли текущему пользователю об изменениях в этом списке.
+        example: true
+        type: boolean
       open_tasks:
         example: 3
         type: integer
@@ -167,6 +171,14 @@ definitions:
       version:
         example: 1
         type: integer
+    type: object
+  internal_features_lists_transport_http.SetNotifyChangesRequest:
+    properties:
+      notify_changes:
+        example: false
+        type: boolean
+    required:
+    - notify_changes
     type: object
   internal_features_statistics_transport_http.GetStatisticsResponse:
     properties:
@@ -218,6 +230,16 @@ definitions:
       title:
         example: Дом
         type: string
+    type: object
+  internal_features_tasks_transport_http.CreateTaskItemRequest:
+    properties:
+      title:
+        example: Молоко
+        maxLength: 200
+        minLength: 1
+        type: string
+    required:
+    - title
     type: object
   internal_features_tasks_transport_http.CreateTaskRequest:
     properties:
@@ -279,6 +301,13 @@ definitions:
         type: string
       id:
         type: integer
+      items_done:
+        example: 3
+        type: integer
+      items_total:
+        description: 'Пункты чеклиста: всего и отмеченных.'
+        example: 7
+        type: integer
       list_id:
         type: integer
       remind_before_minutes:
@@ -311,6 +340,13 @@ definitions:
         type: string
       id:
         type: integer
+      items_done:
+        example: 3
+        type: integer
+      items_total:
+        description: 'Пункты чеклиста: всего и отмеченных.'
+        example: 7
+        type: integer
       list_id:
         type: integer
       remind_before_minutes:
@@ -323,6 +359,18 @@ definitions:
       title:
         type: string
       version:
+        type: integer
+    type: object
+  internal_features_tasks_transport_http.PatchTaskItemRequest:
+    properties:
+      done:
+        example: true
+        type: boolean
+      title:
+        example: Молоко 3.2%
+        type: string
+      version:
+        example: 1
         type: integer
     type: object
   internal_features_tasks_transport_http.PatchTaskRequest:
@@ -376,6 +424,13 @@ definitions:
         type: string
       id:
         type: integer
+      items_done:
+        example: 3
+        type: integer
+      items_total:
+        description: 'Пункты чеклиста: всего и отмеченных.'
+        example: 7
+        type: integer
       list_id:
         type: integer
       remind_before_minutes:
@@ -426,6 +481,13 @@ definitions:
         type: string
       id:
         type: integer
+      items_done:
+        example: 3
+        type: integer
+      items_total:
+        description: 'Пункты чеклиста: всего и отмеченных.'
+        example: 7
+        type: integer
       list_id:
         type: integer
       remind_before_minutes:
@@ -438,6 +500,29 @@ definitions:
       title:
         type: string
       version:
+        type: integer
+    type: object
+  internal_features_tasks_transport_http.TaskItemDTOResponse:
+    properties:
+      created_at:
+        type: string
+      done:
+        example: false
+        type: boolean
+      id:
+        example: 12
+        type: integer
+      position:
+        example: 1
+        type: integer
+      task_id:
+        example: 5
+        type: integer
+      title:
+        example: Молоко
+        type: string
+      version:
+        example: 1
         type: integer
     type: object
   internal_features_users_transport_http.CreateUserRequest:
@@ -913,6 +998,44 @@ paths:
       summary: Исключить участника или выйти из списка
       tags:
       - lists
+  /lists/{id}/notifications:
+    put:
+      consumes:
+      - application/json
+      description: 'Личный переключатель владельца или участника: бот пишет, когда
+        другие добавляют или выполняют задачи. По умолчанию включён'
+      parameters:
+      - description: ID списка
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Включить или выключить
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_features_lists_transport_http.SetNotifyChangesRequest'
+      responses:
+        "204":
+          description: Сохранено
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Сообщать об изменениях в списке
+      tags:
+      - lists
   /lists/join:
     post:
       consumes:
@@ -1221,6 +1344,184 @@ paths:
       security:
       - TelegramInitData: []
       summary: Обновить задачу
+      tags:
+      - tasks
+  /tasks/{id}/items:
+    get:
+      description: Пункты задачи по порядку. Доступ — как у задачи
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_features_tasks_transport_http.TaskItemDTOResponse'
+            type: array
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Чеклист задачи
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Пункт встаёт в конец чеклиста. У задачи не больше 100 пунктов (409)
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Новый пункт
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_features_tasks_transport_http.CreateTaskItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_features_tasks_transport_http.TaskItemDTOResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "409":
+          description: Слишком много пунктов
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Добавить пункт
+      tags:
+      - tasks
+  /tasks/{id}/items/{item_id}:
+    delete:
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: ID пункта
+        in: path
+        name: item_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: Пункт удалён
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Удалить пункт
+      tags:
+      - tasks
+    patch:
+      consumes:
+      - application/json
+      description: Текст и отметка. Необязательное поле 'version' защищает от одновременного
+        изменения (409)
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: ID пункта
+        in: path
+        name: item_id
+        required: true
+        type: integer
+      - description: Изменения
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_features_tasks_transport_http.PatchTaskItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_features_tasks_transport_http.TaskItemDTOResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "401":
+          description: Нет или неверные данные Telegram
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_dadqeds_todoapp_internal_core_transport_http_response.ErrorResponse'
+      security:
+      - TelegramInitData: []
+      summary: Изменить пункт
       tags:
       - tasks
   /users:

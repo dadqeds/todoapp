@@ -104,3 +104,18 @@ func (s *ListsService) RemoveMember(ctx context.Context, listID int, userID int)
 
 	return nil
 }
+
+// SetNotifyChanges — личный переключатель «Сообщать об изменениях» в списке.
+// Меняет его только сам пользователь: владелец или участник.
+func (s *ListsService) SetNotifyChanges(ctx context.Context, listID int, enabled bool) error {
+	_, actor, err := s.getListForView(ctx, listID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.listsRepository.SetNotifyChanges(ctx, listID, actor.User.ID, enabled); err != nil {
+		return fmt.Errorf("set notify changes: %w", err)
+	}
+
+	return nil
+}
